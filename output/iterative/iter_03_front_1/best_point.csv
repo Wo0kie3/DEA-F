@@ -1,2 +1,2 @@
 name,i1,i2,i3,i4,o1,o2,candidate_efficiency,candidate_efficient,WAW_efficiency,KRK_efficiency,WRO_efficiency,GDN_efficiency,BZG_efficiency,min_distance_to_false,efficiency_sum
-RZE_cand_1894_cand_8252_cand_1665,0.42,6,11.3,0.84,0.3,8.043639999999998,1.0,True,1.0,1.0,1.0,1.0,1.0,0.15800000000000003,6.0
+RZE_cand_7284_cand_43438_cand_23960,1.0199999999999998,6,11.3,0.957,0.3,12.438239999999997,1.0,True,1.0,1.0,1.0,1.0,1.0,0.07899999999999985,6.0
