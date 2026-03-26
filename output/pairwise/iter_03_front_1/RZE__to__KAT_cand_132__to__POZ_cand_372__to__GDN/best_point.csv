@@ -1,0 +1,2 @@
+name,i1,i2,i3,i4,o1,o2,candidate_efficiency,candidate_efficient,GDN_efficiency,min_distance_to_false,efficiency_sum
+RZE__to__KAT_cand_132__to__POZ_cand_372__to__GDN_cand_12,0.024,6,11.3,0.8300000000000004,0.3,-18.1807,1.0,True,1.0,0.19,2.0

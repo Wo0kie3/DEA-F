@@ -1,0 +1,4 @@
+iteration,reference_frontier,from_point_name,to_reference_name,error,branch_dir
+1,3,RZE,LCJ,No candidate_efficient == false points found.,output\pairwise\iter_01_front_3\RZE__to__LCJ
+1,3,RZE,SZZ,No candidate_efficient == false points found.,output\pairwise\iter_01_front_3\RZE__to__SZZ
+3,1,RZE__to__KAT_cand_2309__to__POZ_cand_2469,BZG,No candidate_efficient == false points found.,output\pairwise\iter_03_front_1\RZE__to__KAT_cand_2309__to__POZ_cand_2469__to__BZG

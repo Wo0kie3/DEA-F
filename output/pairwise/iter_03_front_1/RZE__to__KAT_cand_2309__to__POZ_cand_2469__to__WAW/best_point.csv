@@ -1,0 +1,2 @@
+name,i1,i2,i3,i4,o1,o2,candidate_efficiency,candidate_efficient,WAW_efficiency,min_distance_to_false,efficiency_sum
+RZE__to__KAT_cand_2309__to__POZ_cand_2469__to__WAW_cand_326,0.6240000000000012,6,11.3,0.2149999999999997,0.3,7.230000000000002,1.0,True,1.0,0.7000000000000002,2.0
