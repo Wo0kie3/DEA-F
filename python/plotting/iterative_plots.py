@@ -131,3 +131,28 @@ def save_combined_iterative_plot(
     _ensure_parent(output_html)
     fig.write_html(output_html)
     print(f"Saved combined iterative plot: {output_html}")
+
+
+def save_all_results_plot(results_csv: str, output_html: str, x: str, y: str, z: str):
+    df = pd.read_csv(results_csv)
+
+    if "candidate_efficient" in df.columns:
+        df["candidate_efficient"] = df["candidate_efficient"].astype(str).str.lower()
+
+    fig = px.scatter_3d(
+        df,
+        x=x,
+        y=y,
+        z=z,
+        color="candidate_efficient",
+        hover_data=[
+            "name",
+            "candidate_efficiency",
+            "candidate_efficient",
+        ],
+        title="All evaluated grid points (true/false)",
+    )
+
+    _ensure_parent(output_html)
+    fig.write_html(output_html)
+    print(f"Saved all-results plot: {output_html}")

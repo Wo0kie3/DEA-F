@@ -33,19 +33,56 @@ def _make_grid_values(start, end, step):
     if values.size == 0:
         values = np.array([lo, hi], dtype=float)
 
+    values = np.unique(values.astype(float))
+    values.sort()
     return values
+
+
+def _get_search_anchor(col, target_value, previous_layer_points):
+    """
+    Defines the lower search anchor for a new frontier.
+
+    Inputs:
+    - use min(previous_layer_points[col]) because smaller is better
+
+    Outputs:
+    - use max(previous_layer_points[col]) because larger is better
+
+    If previous_layer_points is None/empty, fallback to target_value.
+    """
+    if previous_layer_points is None or previous_layer_points.empty:
+        return float(target_value)
+
+    vals = previous_layer_points[col].astype(float)
+
+    if col.startswith("i"):
+        return float(vals.min())
+    elif col.startswith("o"):
+        return float(vals.max())
+    else:
+        raise ValueError(f"Column '{col}' is neither input nor output.")
 
 
 def generate_frontier_samples(
     df,
     columns_to_modify,
     target_front=None,
-    pct_below=20.0,
+    pct_below=0.0,
     pct_above=15.0,
     step_pct=5.0,
     target_name=None,
     target_row=None,
 ):
+    """
+    Generate candidates for a given reference frontier.
+
+    Current logic:
+    - target_row is the fixed base point (e.g. RZE)
+    - for every frontier we always sample from the ORIGINAL start point
+    - we do NOT cut the lower bound using previous frontier points
+    - search space is defined from the start point to the current frontier range
+      expanded by pct_above
+    """
     inputs, outputs = _get_io_columns(df)
     io_cols = inputs + outputs
 
@@ -77,23 +114,24 @@ def generate_frontier_samples(
 
     for col in columns_to_modify:
         t = float(target[col])
-
-        # step liczony ze skali frontieru
         frontier_col = frontier[col].astype(float)
+
         fmin = float(frontier_col.min())
         fmax = float(frontier_col.max())
-        fspan = max(abs(fmax - fmin), abs(fmax), abs(fmin), abs(t), 1.0)
-        step = fspan * (step_pct / 100.0)
+
+        scale = max(abs(fmax - fmin), abs(fmax), abs(fmin), abs(t), 1.0)
+        step = scale * (step_pct / 100.0)
 
         if col.startswith("i"):
-            # input: zwykle chcemy iść w dół (mniej = lepiej),
-            # ale robimy zakres odporny niezależnie od relacji target/frontier
-            start = fmin * (1.0 - pct_below / 100.0)
-            end = t * (1.0 + pct_above / 100.0)
+            # Inputy: od punktu początkowego do najlepszego inputu z frontu
+            start = t
+            end = fmin * (1.0 + pct_above / 100.0)
+
         elif col.startswith("o"):
-            # output: zwykle chcemy iść w górę (więcej = lepiej)
-            start = t * (1.0 - pct_below / 100.0)
+            # Outputy: od punktu początkowego do najlepszego outputu z frontu
+            start = t
             end = fmax * (1.0 + pct_above / 100.0)
+
         else:
             raise ValueError(f"Column '{col}' is neither input nor output.")
 
@@ -102,14 +140,19 @@ def generate_frontier_samples(
         if values.size == 0:
             raise ValueError(
                 f"Empty grid for column '{col}'. "
-                f"target={t}, fmin={fmin}, fmax={fmax}, start={start}, end={end}, step={step}"
+                f"target={t}, fmin={fmin}, fmax={fmax}, "
+                f"start={start}, end={end}, step={step}"
             )
 
         grid[col] = values
 
         print(
-            f"[GRID] {col}: target={t:.6f}, frontier_min={fmin:.6f}, frontier_max={fmax:.6f}, "
-            f"start={start:.6f}, end={end:.6f}, step={step:.6f}, points={len(values)}"
+            f"[GRID] {col}: "
+            f"target={t:.6f}, "
+            f"frontier_min={fmin:.6f}, "
+            f"frontier_max={fmax:.6f}, "
+            f"start={start:.6f}, end={end:.6f}, "
+            f"step={step:.6f}, points={len(values)}"
         )
 
     combos = list(product(*grid.values()))
@@ -118,7 +161,6 @@ def generate_frontier_samples(
         raise ValueError("No candidate combinations generated. Check grid ranges.")
 
     results = []
-
     base_name = str(target["name"]) if "name" in target.index else "target"
 
     for i, combo in enumerate(combos):
