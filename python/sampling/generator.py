@@ -111,7 +111,6 @@ def generate_frontier_samples(
         raise ValueError(f"No rows found for frontier_layer={target_front}")
 
     grid = {}
-
     for col in columns_to_modify:
         t = float(target[col])
         frontier_col = frontier[col].astype(float)
@@ -145,7 +144,6 @@ def generate_frontier_samples(
             )
 
         grid[col] = values
-
         print(
             f"[GRID] {col}: "
             f"target={t:.6f}, "

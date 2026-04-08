@@ -1,6 +1,7 @@
 import argparse
 import csv
 import os
+from datetime import datetime
 from itertools import product
 from pathlib import Path
 
@@ -12,7 +13,10 @@ from java_runner import (
     generate_frontiers_with_java,
     evaluate_candidates_with_java,
 )
-from postprocess.select_next_frontier import select_boundary_true_points
+from postprocess.select_next_frontier import (
+    annotate_boundary_neighbors,
+    select_boundary_true_points,
+)
 
 
 # =========================================================
@@ -66,6 +70,13 @@ def parse_args():
 
 def ensure_parent_dir(path_str: str):
     Path(path_str).parent.mkdir(parents=True, exist_ok=True)
+
+
+def create_run_output_dir(base_output_dir: str, method_name: str) -> Path:
+    run_stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    run_dir = Path(base_output_dir) / method_name / f"run_{run_stamp}"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    return run_dir
 
 
 def path_for_java(path_str: str, java_entry: str) -> str:
@@ -161,7 +172,6 @@ def generate_global_samples(
         raise ValueError(f"Missing columns in dataframe: {missing}")
 
     grid = {}
-
     for col in columns_to_modify:
         t = float(target_row[col])
         col_values = df[col].astype(float)
@@ -196,7 +206,6 @@ def generate_global_samples(
             )
 
         grid[col] = values
-
         print(
             f"[GLOBAL GRID] {col}: "
             f"target={t:.6f}, "
@@ -286,6 +295,49 @@ def save_all_results_plot(results_csv: str, output_html: str, x: str, y: str, z:
     print(f"Saved plot: {output_html}")
 
 
+def save_boundary_flag_plot(results_csv: str, output_html: str, x: str, y: str, z: str, title: str):
+    df = pd.read_csv(results_csv)
+
+    if "candidate_efficient" in df.columns:
+        df["candidate_efficient"] = df["candidate_efficient"].astype(str).str.lower()
+
+    if "boundary_has_false_neighbor" in df.columns:
+        df["boundary_has_false_neighbor"] = df["boundary_has_false_neighbor"].map(
+            lambda v: "boundary" if str(v).lower() == "true" else "not_boundary"
+        )
+
+    df["boundary_plot_group"] = (
+        df["boundary_has_false_neighbor"].astype(str) + "_" + df["candidate_efficient"].astype(str)
+    )
+
+    fig = px.scatter_3d(
+        df,
+        x=x,
+        y=y,
+        z=z,
+        color="boundary_plot_group",
+        symbol="candidate_efficient",
+        hover_data=[
+            "name",
+            "candidate_efficiency",
+            "candidate_efficient",
+            "boundary_has_false_neighbor",
+            "boundary_false_neighbor_count",
+        ],
+        title=title,
+        color_discrete_map={
+            "boundary_true": "#d62728",
+            "boundary_false": "#ff9896",
+            "not_boundary_true": "#1f77b4",
+            "not_boundary_false": "#2ca02c",
+        },
+    )
+
+    ensure_parent_dir(output_html)
+    fig.write_html(output_html)
+    print(f"Saved plot: {output_html}")
+
+
 def save_selected_points_plot(selected_csv: str, output_html: str, x: str, y: str, z: str, title: str):
     df = pd.read_csv(selected_csv)
 
@@ -296,6 +348,24 @@ def save_selected_points_plot(selected_csv: str, output_html: str, x: str, y: st
         z=z,
         color="reference_frontier",
         hover_data=["name", "candidate_efficiency", "efficiency_sum", "selected_rank"],
+        title=title,
+    )
+
+    ensure_parent_dir(output_html)
+    fig.write_html(output_html)
+    print(f"Saved plot: {output_html}")
+
+
+def save_boundary_points_plot(boundary_csv: str, output_html: str, x: str, y: str, z: str, title: str):
+    df = pd.read_csv(boundary_csv)
+
+    fig = px.scatter_3d(
+        df,
+        x=x,
+        y=y,
+        z=z,
+        color="reference_frontier",
+        hover_data=["name", "candidate_efficiency", "boundary_false_neighbor_count"],
         title=title,
     )
 
@@ -402,15 +472,16 @@ def main():
     args = parse_args()
     columns = [c.strip() for c in args.columns.split(",")]
 
-    ensure_parent_dir(args.frontiers_output)
-    Path(args.output_dir).mkdir(parents=True, exist_ok=True)
+    run_dir = create_run_output_dir(args.output_dir, "frontier_global")
+    frontiers_output_path = run_dir / Path(args.frontiers_output).name
 
     # -----------------------------------------------------
     # 1. Generate frontiers
     # -----------------------------------------------------
     print("Step 1: generating frontier layers with Java...")
+    print(f"Run output directory: {run_dir}")
     input_java = path_for_java(args.input, args.java_entry)
-    frontiers_output_java = path_for_java(args.frontiers_output, args.java_entry)
+    frontiers_output_java = path_for_java(str(frontiers_output_path), args.java_entry)
 
     generate_frontiers_with_java(
         input_csv=input_java,
@@ -420,7 +491,7 @@ def main():
         maven_executable=args.maven_executable,
     )
 
-    df_frontiers = pd.read_csv(args.frontiers_output)
+    df_frontiers = pd.read_csv(frontiers_output_path)
     inputs, outputs = get_io_columns(df_frontiers)
     io_cols = inputs + outputs
 
@@ -451,7 +522,7 @@ def main():
     # -----------------------------------------------------
     # 2. Generate ONE global grid
     # -----------------------------------------------------
-    global_dir = Path(args.output_dir) / "global_grid"
+    global_dir = run_dir / "global_grid"
     global_dir.mkdir(parents=True, exist_ok=True)
 
     global_samples_csv = global_dir / "samples_global.csv"
@@ -507,11 +578,13 @@ def main():
         print(f"Reference frontier: {current_front}")
         print("Evaluating SAME global grid against this frontier...")
 
-        iter_dir = Path(args.output_dir) / f"iter_{step_idx:02d}_front_{current_front}"
+        iter_dir = run_dir / f"iter_{step_idx:02d}_front_{current_front}"
         iter_dir.mkdir(parents=True, exist_ok=True)
 
         results_output = iter_dir / "results.csv"
+        results_boundary_flag_output = iter_dir / "results_with_boundary_flag.csv"
         all_results_plot_output = iter_dir / "all_results_plot.html"
+        boundary_flag_plot_output = iter_dir / "boundary_flag_plot.html"
         boundary_output = iter_dir / "boundary_true.csv"
         selected_output = iter_dir / "selected_points.csv"
 
@@ -535,12 +608,25 @@ def main():
         )
 
         df_results = pd.read_csv(results_output)
+        df_results_annotated = annotate_boundary_neighbors(
+            df=df_results,
+            feature_cols=columns,
+        )
+        df_results_annotated.to_csv(results_boundary_flag_output, index=False)
+
+        save_boundary_flag_plot(
+            results_csv=str(results_boundary_flag_output),
+            output_html=str(boundary_flag_plot_output),
+            x=args.plot_x,
+            y=args.plot_y,
+            z=args.plot_z,
+            title=f"Boundary-neighbor flag vs frontier {current_front}",
+        )
 
         print("Selecting boundary solution set...")
         df_boundary = select_boundary_true_points(
-            df=df_results,
+            df=df_results_annotated,
             feature_cols=columns,
-            k_nearest_true_per_false=args.boundary_k,
         )
 
         df_boundary["iteration"] = step_idx
@@ -556,6 +642,8 @@ def main():
 
         print(f"Saved boundary true points: {boundary_output}")
         print(f"Boundary true count: {len(df_boundary)}")
+        print(f"Saved annotated results: {results_boundary_flag_output}")
+        print(f"Saved boundary flag plot: {boundary_flag_plot_output}")
         print(f"Saved selected points: {selected_output}")
         print(f"Selected points count: {len(df_selected)}")
 
@@ -581,16 +669,27 @@ def main():
         if all_selected_points else pd.DataFrame()
     )
 
-    boundary_all_path = Path(args.output_dir) / "boundary_true_all_layers.csv"
-    selected_all_path = Path(args.output_dir) / "selected_points_all_layers.csv"
-    selected_all_plot = Path(args.output_dir) / "selected_points_all_layers.html"
-    paths_all_path = Path(args.output_dir) / "all_paths_cartesian.csv"
+    boundary_all_path = run_dir / "boundary_true_all_layers.csv"
+    boundary_all_plot = run_dir / "boundary_true_all_layers.html"
+    selected_all_path = run_dir / "selected_points_all_layers.csv"
+    selected_all_plot = run_dir / "selected_points_all_layers.html"
+    paths_all_path = run_dir / "all_paths_cartesian.csv"
 
     boundary_all_df.to_csv(boundary_all_path, index=False)
     selected_all_df.to_csv(selected_all_path, index=False)
 
     print(f"Aggregated boundary points: {boundary_all_path}")
     print(f"Aggregated selected points: {selected_all_path}")
+
+    if not boundary_all_df.empty:
+        save_boundary_points_plot(
+            boundary_csv=str(boundary_all_path),
+            output_html=str(boundary_all_plot),
+            x=args.plot_x,
+            y=args.plot_y,
+            z=args.plot_z,
+            title="Boundary points across all frontiers",
+        )
 
     if not selected_all_df.empty:
         save_selected_points_plot(
@@ -613,6 +712,7 @@ def main():
     print("DONE")
     print(f"Global samples:         {global_samples_csv}")
     print(f"Boundary all layers:    {boundary_all_path}")
+    print(f"Boundary all plot:      {boundary_all_plot}")
     print(f"Selected all layers:    {selected_all_path}")
     print(f"Selected all plot:      {selected_all_plot}")
     print(f"All paths CSV:          {paths_all_path}")

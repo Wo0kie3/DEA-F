@@ -1,6 +1,6 @@
-from pathlib import Path
-import numpy as np
 import pandas as pd
+from pathlib import Path
+from itertools import product
 
 
 def _get_feature_columns(df: pd.DataFrame):
@@ -19,28 +19,27 @@ def _get_efficiency_columns(df: pd.DataFrame):
     return [c for c in df.columns if c.endswith("_efficiency")]
 
 
-def _pairwise_euclidean_distance(a: np.ndarray, b: np.ndarray) -> np.ndarray:
-    diff = a[:, None, :] - b[None, :, :]
-    return np.sqrt(np.sum(diff ** 2, axis=2))
-
-
-def select_boundary_true_points(
+def annotate_boundary_neighbors(
     df: pd.DataFrame,
     feature_cols: list[str] | None = None,
-    k_nearest_true_per_false: int = 3,
 ) -> pd.DataFrame:
     """
-    Keep efficient=True points that lie closest to inefficient=False points.
+    Annotate all evaluated grid points with boundary-neighborhood metadata.
 
-    New logic:
-    - for each false point, keep k nearest true points
-    - then deduplicate them
+    Directional neighborhood follows the "worse-than-current" side:
+    - inputs:  0 or +1 grid step
+    - outputs: 0 or -1 grid step
 
-    This keeps a thicker boundary and preserves a fuller grid.
+    For i1, i2, o1 we check combinations such as:
+    (+1, 0, 0), (0, +1, 0), (0, 0, -1),
+    (+1, +1, 0), (+1, 0, -1), (0, +1, -1), (+1, +1, -1)
     """
 
     if feature_cols is None:
         feature_cols = _get_feature_columns(df)
+
+    if not feature_cols:
+        raise ValueError("feature_cols is empty.")
 
     if "candidate_efficient" not in df.columns:
         raise ValueError("Column 'candidate_efficient' not found.")
@@ -55,32 +54,80 @@ def select_boundary_true_points(
     if df_false.empty:
         raise ValueError("No candidate_efficient == false points found.")
 
-    x_true = df_true[feature_cols].to_numpy(dtype=float)
-    x_false = df_false[feature_cols].to_numpy(dtype=float)
+    rounding_digits = 10
 
-    dist_matrix = _pairwise_euclidean_distance(x_false, x_true)
+    level_maps = {}
+    for col in feature_cols:
+        unique_values = sorted({round(float(v), rounding_digits) for v in df[col].tolist()})
+        if not unique_values:
+            raise ValueError(f"No grid levels found for column '{col}'.")
+        level_maps[col] = {value: idx for idx, value in enumerate(unique_values)}
 
-    k = min(k_nearest_true_per_false, len(df_true))
-    nearest_true_pos = np.argsort(dist_matrix, axis=1)[:, :k]
+    def _grid_index_key(row: pd.Series) -> tuple[int, ...]:
+        return tuple(
+            level_maps[col][round(float(row[col]), rounding_digits)]
+            for col in feature_cols
+        )
 
-    selected_parts = []
+    false_index_keys = {
+        _grid_index_key(row)
+        for _, row in df_false.iterrows()
+    }
 
-    for false_idx in range(len(df_false)):
-        true_positions = nearest_true_pos[false_idx]
-        distances = dist_matrix[false_idx, true_positions]
+    offsets_per_dim = []
+    for col in feature_cols:
+        if col.startswith("i"):
+            offsets_per_dim.append((0, 1))
+        elif col.startswith("o"):
+            offsets_per_dim.append((0, -1))
+        else:
+            raise ValueError(f"Column '{col}' is neither input nor output.")
 
-        part = df_true.iloc[true_positions].copy()
-        part["source_false_idx"] = false_idx
-        part["min_distance_to_false"] = distances
-        selected_parts.append(part)
+    out = df.copy()
+    out["boundary_has_false_neighbor"] = False
+    out["boundary_false_neighbor_count"] = 0
 
-    selected_true = pd.concat(selected_parts, ignore_index=True)
+    for row_idx, row in df.iterrows():
+        if str(row["candidate_efficient"]).lower() != "true":
+            continue
+
+        base_index_key = _grid_index_key(row)
+        false_neighbor_count = 0
+
+        for offset_combo in product(*offsets_per_dim):
+            if all(offset == 0 for offset in offset_combo):
+                continue
+
+            neighbor_index_key = tuple(
+                base_idx + offset
+                for base_idx, offset in zip(base_index_key, offset_combo)
+            )
+
+            if neighbor_index_key in false_index_keys:
+                false_neighbor_count += 1
+
+        if false_neighbor_count > 0:
+            out.at[row_idx, "boundary_has_false_neighbor"] = True
+            out.at[row_idx, "boundary_false_neighbor_count"] = false_neighbor_count
+
+    return out
+
+
+def select_boundary_true_points(
+    df: pd.DataFrame,
+    feature_cols: list[str] | None = None,
+) -> pd.DataFrame:
+    annotated = annotate_boundary_neighbors(
+        df=df,
+        feature_cols=feature_cols,
+    )
 
     selected_true = (
-        selected_true
-        .sort_values("min_distance_to_false", ascending=True)
-        .drop_duplicates(subset=["index"])
-        .drop(columns=["index", "source_false_idx"], errors="ignore")
+        annotated[
+            (annotated["candidate_efficient"].astype(str).str.lower() == "true")
+            & (annotated["boundary_has_false_neighbor"])
+        ]
+        .copy()
         .reset_index(drop=True)
     )
 
@@ -105,14 +152,12 @@ def process_dea_results(
     boundary_output_csv: str,
     best_output_csv: str,
     feature_cols: list[str] | None = None,
-    k_nearest_true_per_false: int = 3,
 ):
     df = pd.read_csv(input_csv)
 
     boundary_true_df = select_boundary_true_points(
         df=df,
         feature_cols=feature_cols,
-        k_nearest_true_per_false=k_nearest_true_per_false,
     )
 
     best_point = select_best_candidate_by_efficiency_sum(boundary_true_df)
