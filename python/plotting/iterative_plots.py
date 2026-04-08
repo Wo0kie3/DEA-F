@@ -26,6 +26,30 @@ def save_boundary_plot(boundary_csv: str, output_html: str, x: str, y: str, z: s
     print(f"Saved boundary plot: {output_html}")
 
 
+def save_selected_points_plot(selected_csv: str, output_html: str, x: str, y: str, z: str):
+    df = pd.read_csv(selected_csv)
+
+    fig = px.scatter_3d(
+        df,
+        x=x,
+        y=y,
+        z=z,
+        color="iteration",
+        hover_data=[
+            "name",
+            "reference_frontier",
+            "selected_rank",
+            "candidate_efficiency",
+            "efficiency_sum",
+        ],
+        title="Selected points across iterations",
+    )
+
+    _ensure_parent(output_html)
+    fig.write_html(output_html)
+    print(f"Saved selected-points plot: {output_html}")
+
+
 def save_best_points_plot(best_csv: str, output_html: str, x: str, y: str, z: str):
     df = pd.read_csv(best_csv)
 
@@ -156,3 +180,46 @@ def save_all_results_plot(results_csv: str, output_html: str, x: str, y: str, z:
     _ensure_parent(output_html)
     fig.write_html(output_html)
     print(f"Saved all-results plot: {output_html}")
+
+
+def save_boundary_flag_plot(results_csv: str, output_html: str, x: str, y: str, z: str):
+    df = pd.read_csv(results_csv)
+
+    if "candidate_efficient" in df.columns:
+        df["candidate_efficient"] = df["candidate_efficient"].astype(str).str.lower()
+
+    if "boundary_has_false_neighbor" in df.columns:
+        df["boundary_has_false_neighbor"] = df["boundary_has_false_neighbor"].map(
+            lambda v: "boundary" if str(v).lower() == "true" else "not_boundary"
+        )
+
+    df["boundary_plot_group"] = (
+        df["boundary_has_false_neighbor"].astype(str) + "_" + df["candidate_efficient"].astype(str)
+    )
+
+    fig = px.scatter_3d(
+        df,
+        x=x,
+        y=y,
+        z=z,
+        color="boundary_plot_group",
+        symbol="candidate_efficient",
+        hover_data=[
+            "name",
+            "candidate_efficiency",
+            "candidate_efficient",
+            "boundary_has_false_neighbor",
+            "boundary_false_neighbor_count",
+        ],
+        title="Grid points with boundary-neighbor flag",
+        color_discrete_map={
+            "boundary_true": "#d62728",
+            "boundary_false": "#ff9896",
+            "not_boundary_true": "#1f77b4",
+            "not_boundary_false": "#2ca02c",
+        },
+    )
+
+    _ensure_parent(output_html)
+    fig.write_html(output_html)
+    print(f"Saved boundary-flag plot: {output_html}")
