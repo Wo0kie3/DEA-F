@@ -2,15 +2,17 @@
 
 Repo zawiera pipeline'y Python + Java do generowania robust improvement paths w DEA na podstawie:
 
-- `_archive/old_items_20260531/Robust_Improvement_Paths_in_Data_Envelopment_Analysis.pdf`
+- `Robust_Improvement_Paths_in_Data_Envelopment_Analysis.pdf`
 
 Python orkiestruje przebieg, a Java uruchamiana przez Maven liczy dokładne metryki robust DEA z biblioteki `robustDEA`.
 
 ## Porzadek W Repo
 
 Aktywna czesc repo zostala ograniczona do metod 1-5 i ich bezposrednich zaleznosci.
-Starsze skrypty, klasy Java, wyniki, build artifacts, PDF-y referencyjne oraz lokalne kopie
+Starsze skrypty, klasy Java, wyniki, build artifacts oraz lokalne kopie
 `robustDEA` sa w `_archive/old_items_20260531`.
+
+PDF-y referencyjne sa trzymane lokalnie w glownym katalogu repo i ignorowane przez Git.
 
 Mapowanie do poprzedniego ukladu jest w `_archive/old_items_20260531/restore_map.csv`.
 Przywracanie poprzedniego ukladu:

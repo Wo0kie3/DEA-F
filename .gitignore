@@ -9,6 +9,12 @@ out/
 data/
 output/
 
+# Local reference PDFs
+RobustEfficiencyAnalysis.pdf
+Robust_Improvement_Paths_in_Data_Envelopment_Analysis.pdf
+stepwiseSorting.pdf
+TargetsRoubstDEA.pdf
+
 # Python caches
 __pycache__/
 *.py[cod]
