@@ -2,6 +2,8 @@
 
 > Skrócone podsumowanie projektu, opis bieżących zmian i kompletna instrukcja
 > uruchomienia na innym komputerze: [`PROJECT_SUMMARY.md`](PROJECT_SUMMARY.md).
+> Kontekst metodologiczny i zasady pracy dla kolejnych agentów:
+> [`AGENTS.md`](AGENTS.md).
 
 Repo zawiera pipeline'y Python + Java do generowania robust improvement paths w DEA na podstawie:
 
