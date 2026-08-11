@@ -4,6 +4,13 @@
 > uruchomienia na innym komputerze: [`PROJECT_SUMMARY.md`](PROJECT_SUMMARY.md).
 > Kontekst metodologiczny i zasady pracy dla kolejnych agentów:
 > [`AGENTS.md`](AGENTS.md).
+> Instrukcja przygotowania porównywalnego outputu 2D, certyfikatu i
+> interaktywnego wykresu:
+> [`docs/EXPERIMENT_OUTPUT_AND_VISUALIZATION.md`](docs/EXPERIMENT_OUTPUT_AND_VISUALIZATION.md).
+> Lekki przykład gotowego wykresu:
+> [`examples/five_unit_2d/minimalne_sciezki_5_jednostek.html`](examples/five_unit_2d/minimalne_sciezki_5_jednostek.html).
+> Parametry przykładowego eksperymentu:
+> [`examples/five_unit_2d/experiment_params.csv`](examples/five_unit_2d/experiment_params.csv).
 
 Repo zawiera pipeline'y Python + Java do generowania robust improvement paths w DEA na podstawie:
 
@@ -316,6 +323,12 @@ Interpretacja eksperymentu:
 - Brak ścieżek jest tutaj częsty i informacyjny: oznacza, że w danej siatce nie ma stanu, który jednocześnie zmniejsza width i nie pogarsza postępu.
 
 ## Jak Czytać Wyniki Eksperymentu
+
+Kompletny workflow dla porównania kilku jednostek w jednym pliku HTML znajduje
+się w
+[`docs/EXPERIMENT_OUTPUT_AND_VISUALIZATION.md`](docs/EXPERIMENT_OUTPUT_AND_VISUALIZATION.md).
+Dokument opisuje wspólne parametry, sekwencyjne uruchamianie ciężkich runów,
+agregację metryk, certyfikat minimalności, standard wykresu oraz krótkiej tabeli.
 
 Najważniejsze pliki wspólne:
 

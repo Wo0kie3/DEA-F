@@ -1,6 +1,6 @@
 # Podsumowanie projektu DEA-F
 
-Stan dokumentu: 11 sierpnia 2026 r.
+Stan dokumentu: 12 sierpnia 2026 r.
 
 ## Cel projektu
 
@@ -30,10 +30,14 @@ Projekt implementuje pięć metod: ścieżkę po diagramie Hassego, ścieżkę p
 | `java/` | Projekt Maven i klasy eksportujące metryki robust DEA do CSV. |
 | `input/` | Dane wejściowe (`EDU.csv`, `airports.csv`) i dane pomocnicze. |
 | `templates/` | Szablony danych, opisów metryk i przykładowego raportu. |
+| `docs/EXPERIMENT_OUTPUT_AND_VISUALIZATION.md` | Kanoniczna instrukcja porównywalnego outputu 2D, certyfikatu, wykresu i tabeli. |
+| `examples/five_unit_2d/` | Lekka, referencyjna wersja interaktywnego porównania pięciu DMU. |
 | `run_edu_3d_experiment.ps1` | Uruchomienie wszystkich pięciu metod dla eksperymentu EDU 3D. |
 | `output/` | Lokalne wyniki eksperymentów; katalog jest ignorowany przez Git. |
 
 Szczegółowy opis parametrów każdej metody i interpretacji wyników znajduje się w `README.md`.
+Standard końcowego pliku z interaktywnym wykresem i krótką tabelą opisuje
+`docs/EXPERIMENT_OUTPUT_AND_VISUALIZATION.md`.
 
 ## Aktualny kierunek zmian
 

@@ -1,0 +1,77 @@
+scope,parameter,value,description
+common,experiment_name,five_unit_2d_stepwise,Porównanie pięciu jednostek w dwóch modyfikowanych inputach
+common,experiment_date,2026-08-03,Data wykonania właściwych przebiegów
+common,input,input/publication_example_search.csv,Wspólny zbiór referencyjny
+common,targets,"T_C,T_B,T_A,T_D,M07",Kolejność jednostek na wykresie
+common,target_selection_rule,five lowest initial best_efficiency,Reguła wyboru jednostek do przykładu
+common,pipeline,python/4_best_efficiency_path_pipeline.py,Pipeline najlepszej efektywności
+common,method,best_efficiency_path,Nazwa metody zapisywana w path_metrics.csv
+common,mode,fictive,Ścieżki przez sztucznie generowane stany
+common,dea_dimensions,"i1,i2,o1",Wymiary modelu DEA
+common,modified_dimensions,"i1,i2",Wymiary zmieniane podczas eksperymentu
+common,fixed_dimension,o1,Output pozostaje równy wartości początkowej danej DMU
+common,target_best_efficiency,0.92,Końcowy milestone najlepszej efektywności
+common,stages,3,Liczba etapów poprawy
+common,pct_above,5,Rozszerzenie dolnej granicy przestrzeni inputów
+common,step_pct,25,Krok bazowej siatki jako procent zakresu
+common,min_points_per_dim,5,Minimalna liczba punktów bazowej siatki na wymiar
+common,initial_grid_points,25,Siatka bazowa 5x5
+common,max_candidates,200,Limit kandydatów bazowych
+common,points_per_stage,20,Historyczna nazwa limitu kandydatów na przejście
+common,points_per_stage_semantics,per predecessor transition,Limit stosowany osobno względem faktycznego poprzednika
+common,max_paths,unlimited,Argument max-paths nie został przekazany
+common,refine_fictive_candidates,true,Włączenie numerycznego refinementu
+common,refine_iterations,5,Liczba iteracji refinementu
+common,refine_max_seeds,5,Maksymalna liczba centrów refinementu na etap
+common,local_search_sampling,stratified,Strategia lokalnego próbkowania
+common,local_search_samples,100,Liczba punktów wokół jednego centrum
+common,local_search_grid,10x10,Warstwowa siatka lokalna w dwóch wymiarach
+common,local_search_step_multiplier,1.5,Promień pudełka jako mnożnik kroku bazowego
+common,local_search_random_state,42,Bazowe ziarno przekazane w CLI
+common,local_search_stage_seeds,"43,44,45",Kod dodaje numer etapu do bazowego ziarna
+common,global_search_sampling,stratified,Strategia globalnego próbkowania
+common,global_search_samples,400,Liczba punktów globalnych
+common,global_search_grid,20x20,Warstwowa siatka globalna
+common,global_search_random_state,142,Ziarno globalnego próbkowania
+common,candidate_evaluation_batch_size,500,Domyślny rozmiar partii ocenianej przez JVM
+common,transition_reference,previous selected point,Kandydat etapu jest oceniany względem poprzednika w danej gałęzi
+common,transition_tolerance,1e-9,Tolerancja osiągalności i dominacji
+common,normalization_source,reference input ranges,Stałe zakresy max-min ze zbioru wejściowego
+common,normalization_range_i1,6.9,max(i1)-min(i1)
+common,normalization_range_i2,6.8,max(i2)-min(i2)
+common,normalization_range_o1,5.2,max(o1)-min(o1)
+common,factor_weights,equal 1/3,"Równe wagi i1, i2 i o1; zmiana stałego o1 wynosi zero"
+common,path_selection,"minimum TC within 1e-9, then minimum MSC, then path_id",Reguła wyboru ścieżki prezentacyjnej
+common,execution_mode,sequential,Przebiegi Maven/JVM nie były uruchamiane równolegle
+common,source_revision_at_execution,not recorded,Commit nie został zapisany w chwili wykonania eksperymentu
+common,source_semantics,stepwise predecessor-specific fronts,Front minimalnych zmian liczony osobno dla faktycznego poprzednika
+T_C,start_i1,9.3,Wartość początkowa
+T_C,start_i2,7.5,Wartość początkowa
+T_C,fixed_o1,4.8,Stały output
+T_C,global_bounds_i1,"[2.28,9.3]",Osiągalny zakres globalnego próbkowania
+T_C,global_bounds_i2,"[2.185,7.5]",Osiągalny zakres globalnego próbkowania
+T_B,start_i1,8.2,Wartość początkowa
+T_B,start_i2,9.1,Wartość początkowa
+T_B,fixed_o1,5.0,Stały output
+T_B,global_bounds_i1,"[2.28,8.2]",Osiągalny zakres globalnego próbkowania
+T_B,global_bounds_i2,"[2.185,9.1]",Osiągalny zakres globalnego próbkowania
+T_A,start_i1,9.0,Wartość początkowa
+T_A,start_i2,8.2,Wartość początkowa
+T_A,fixed_o1,5.2,Stały output
+T_A,global_bounds_i1,"[2.28,9.0]",Osiągalny zakres globalnego próbkowania
+T_A,global_bounds_i2,"[2.185,8.2]",Osiągalny zakres globalnego próbkowania
+T_D,start_i1,8.7,Wartość początkowa
+T_D,start_i2,7.8,Wartość początkowa
+T_D,fixed_o1,5.8,Stały output
+T_D,global_bounds_i1,"[2.28,8.7]",Osiągalny zakres globalnego próbkowania
+T_D,global_bounds_i2,"[2.185,7.8]",Osiągalny zakres globalnego próbkowania
+M07,start_i1,7.2,Wartość początkowa
+M07,start_i2,6.1,Wartość początkowa
+M07,fixed_o1,6.9,Stały output
+M07,global_bounds_i1,"[2.28,7.2]",Osiągalny zakres globalnego próbkowania
+M07,global_bounds_i2,"[2.185,6.1]",Osiągalny zakres globalnego próbkowania
+visualization,generator,python/generate_five_unit_2d_html.py,Generator wspólnego wykresu i tabeli
+visualization,plotly_mode,cdn,Lekka wersja repozytoryjna
+visualization,plotly_js_version,3.3.1,Wersja ładowana z CDN
+visualization,axis_scale,equal,Jedna jednostka i1 odpowiada jednej jednostce i2
+visualization,output,examples/five_unit_2d/minimalne_sciezki_5_jednostek.html,Plik przykładowy w repozytorium

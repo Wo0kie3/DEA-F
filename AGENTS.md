@@ -21,6 +21,8 @@ Python odpowiada za generowanie kandydatów, składanie ścieżek, metryki, rapo
 - `python/minimality_certificate.py` — certyfikat minimalności względem przebadanej puli.
 - `python/collect_path_metrics.py` — agregacja wyników metod.
 - `python/render_*`, `python/generate_*`, `python/visualize_*` — raportowanie i wizualizacje.
+- `docs/EXPERIMENT_OUTPUT_AND_VISUALIZATION.md` — kanoniczny workflow porównywalnych eksperymentów 2D i standard końcowego wykresu.
+- `examples/five_unit_2d/` — pojedyncza lekka wersja referencyjna wykresu; właściwe, samowystarczalne artefakty pozostają w `output/`.
 - `python/java_runner.py` — jedyne aktywne miejsce wywołań klas Java przez Maven.
 - `java/src/main/java/org/example/` — adaptery CSV do biblioteki robust DEA.
 - `input/` — dane wejściowe; `templates/` — szablony metryk i raportów.
@@ -101,6 +103,8 @@ Milestone’y metod 3–5 są interpolowane liniowo od wartości startowej do ce
 - Ocena dużych pul jest dzielona na partie po 500 kandydatów, ponieważ duże jednorazowe wywołania solvera mogą wyczerpać pamięć JVM/SCIP.
 - Dla porównywalnych eksperymentów zachowuj parametry i ziarna losowe w `experiment_params.csv`.
 - Ciężkie eksperymenty uruchamiaj sekwencyjnie. Równoległe instancje Maven/JVM powodowały awarie z braku pamięci.
+- Przy przygotowywaniu wspólnego outputu 2D stosuj `docs/EXPERIMENT_OUTPUT_AND_VISUALIZATION.md`. Nie łącz runów o różnych parametrach i nie zastępuj frontów liczonych względem faktycznego poprzednika frontem globalnym względem startu.
+- Do Git dodawaj tylko lekką wersję przykładową z `--plotly-mode cdn`. Nie commituj samowystarczalnego HTML z osadzonym kodem Plotly ani kopii całych katalogów wynikowych.
 
 ## Pliki wynikowe
 

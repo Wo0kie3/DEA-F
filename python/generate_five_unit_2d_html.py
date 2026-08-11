@@ -12,6 +12,9 @@ from minimality_certificate import find_selected_path
 from visualize_minimality_2d import load_visualization_data
 
 
+PLOTLY_CDN_URL = "https://cdn.plot.ly/plotly-3.3.1.min.js"
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Build one self-contained interactive comparison of 2D DEA paths."
@@ -20,6 +23,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--targets", required=True)
     parser.add_argument("--input", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument(
+        "--plotly-mode",
+        choices=["embedded", "cdn"],
+        default="embedded",
+        help="Embed Plotly for a self-contained output or use the CDN for a small repo example.",
+    )
     return parser.parse_args()
 
 
@@ -106,8 +115,13 @@ def load_target(root: Path, target: str, input_frame: pd.DataFrame) -> dict:
     }
 
 
-def build_html(payload: dict, output: Path):
-    plotly_js = get_plotlyjs()
+def build_html(payload: dict, output: Path, plotly_mode: str = "embedded"):
+    if plotly_mode == "embedded":
+        plotly_tag = f"<script>{get_plotlyjs()}</script>"
+    elif plotly_mode == "cdn":
+        plotly_tag = f'<script src="{PLOTLY_CDN_URL}" charset="utf-8"></script>'
+    else:
+        raise ValueError(f"Unsupported Plotly mode: {plotly_mode}")
     data_json = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
     default_target = payload["order"][0]
     target_buttons = "\n".join(
@@ -200,7 +214,7 @@ def build_html(payload: dict, output: Path):
       #plot {{ height: 560px; }}
     }}
   </style>
-  <script>{plotly_js}</script>
+  {plotly_tag}
 </head>
 <body>
   <main>
@@ -389,7 +403,7 @@ def main():
             for target in targets
         },
     }
-    build_html(payload, args.output.resolve())
+    build_html(payload, args.output.resolve(), plotly_mode=args.plotly_mode)
     print(args.output.resolve())
 
 

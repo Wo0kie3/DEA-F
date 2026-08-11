@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Minimalne ścieżki DEA - porównanie pięciu jednostek</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #17324a;
+      --muted: #607284;
+      --line: #d7e0e7;
+      --soft: #f5f8fa;
+      --accent: #2878b5;
+      --stage-1: #df5a56;
+      --stage-2: #3978b5;
+      --stage-3: #43a06b;
+      --start: #f0aa18;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      color: var(--ink);
+      background: #ffffff;
+    }
+    main {
+      width: min(1180px, calc(100% - 32px));
+      margin: 24px auto 36px;
+    }
+    header {
+      display: flex;
+      gap: 16px;
+      align-items: end;
+      justify-content: space-between;
+      border-bottom: 2px solid var(--accent);
+      padding-bottom: 12px;
+      margin-bottom: 14px;
+    }
+    h1 { margin: 0; font-size: clamp(22px, 3vw, 34px); font-weight: 600; }
+    .subtitle { margin: 5px 0 0; color: var(--muted); }
+    .unit-controls { display: flex; flex-wrap: wrap; gap: 7px; justify-content: flex-end; }
+    .unit-button {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 7px 14px;
+      background: #ffffff;
+      color: var(--ink);
+      cursor: pointer;
+      font: inherit;
+    }
+    .unit-button.active { background: var(--ink); color: #ffffff; border-color: var(--ink); }
+    .plot-wrap { width: 100%; min-height: 610px; }
+    #plot { width: 100%; height: 610px; }
+    .result-line {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 9px 22px;
+      align-items: baseline;
+      margin: 8px 0 12px;
+      color: var(--muted);
+    }
+    .result-line strong { color: var(--ink); }
+    table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+    th, td { padding: 9px 10px; border-bottom: 1px solid var(--line); text-align: right; }
+    th { background: var(--ink); color: #ffffff; font-weight: 600; }
+    th:first-child, td:first-child, th:nth-child(2), td:nth-child(2) { text-align: left; }
+    tbody tr:nth-child(even) { background: var(--soft); }
+    .status { text-align: center; }
+    footer { margin-top: 14px; color: var(--muted); font-size: 12px; }
+    @media (max-width: 720px) {
+      main { width: min(100% - 18px, 1180px); margin-top: 12px; }
+      header { align-items: flex-start; flex-direction: column; }
+      .unit-controls { justify-content: flex-start; }
+      #plot { height: 520px; }
+      .plot-wrap { min-height: 520px; }
+      .table-wrap { overflow-x: auto; }
+      table { min-width: 700px; }
+    }
+    @media print {
+      .unit-controls, .modebar, .updatemenu-container, .slider-container { display: none !important; }
+      main { width: 100%; margin: 0; }
+      #plot { height: 560px; }
+    }
+  </style>
+  <script src="https://cdn.plot.ly/plotly-3.3.1.min.js" charset="utf-8"></script>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>Minimalne ścieżki poprawy efektywności DEA</h1>
+        <p class="subtitle">Dwa zmieniane wejścia: i1, i2; wyjście o1 pozostaje stałe dla wybranej jednostki.</p>
+      </div>
+      <nav class="unit-controls" aria-label="Wybór jednostki">
+        <button type="button" class="unit-button active" data-target="T_C" aria-pressed="true">T_C</button>
+<button type="button" class="unit-button" data-target="T_B" aria-pressed="false">T_B</button>
+<button type="button" class="unit-button" data-target="T_A" aria-pressed="false">T_A</button>
+<button type="button" class="unit-button" data-target="T_D" aria-pressed="false">T_D</button>
+<button type="button" class="unit-button" data-target="M07" aria-pressed="false">M07</button>
+      </nav>
+    </header>
+    <section class="plot-wrap" aria-label="Interaktywny wykres frontów Pareto i minimalnej ścieżki">
+      <div id="plot"></div>
+    </section>
+    <section aria-label="Minimalna ścieżka wybranej jednostki">
+      <div id="result-line" class="result-line"></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Etap</th><th>Punkt</th><th>i1</th><th>i2</th><th>Efektywność</th><th>Wysiłek kroku</th><th>Status</th></tr>
+          </thead>
+          <tbody id="path-table"></tbody>
+        </table>
+      </div>
+    </section>
+    <footer>Wspólne parametry: cel efektywności 0,92; 3 etapy; globalny grid 20×20; lokalne siatki 10×10; wybór: minimalne TC, następnie minimalne MSC.</footer>
+  </main>
+  <script>
+    const DATA = {"order":["T_C","T_B","T_A","T_D","M07"],"dmus":[{"name":"E01","i1":2.4,"i2":7.0,"o1":9.2},{"name":"E02","i1":3.2,"i2":5.6,"o1":9.8},{"name":"E03","i1":4.4,"i2":4.2,"o1":10.0},{"name":"E04","i1":5.8,"i2":3.1,"o1":9.7},{"name":"E05","i1":7.2,"i2":2.3,"o1":9.0},{"name":"M01","i1":4.8,"i2":6.8,"o1":8.7},{"name":"M02","i1":5.5,"i2":5.9,"o1":8.4},{"name":"M03","i1":6.4,"i2":5.0,"o1":8.0},{"name":"M04","i1":7.0,"i2":4.3,"o1":7.8},{"name":"M05","i1":7.7,"i2":3.5,"o1":7.4},{"name":"M06","i1":6.0,"i2":7.0,"o1":7.5},{"name":"M07","i1":7.2,"i2":6.1,"o1":6.9},{"name":"M08","i1":5.2,"i2":7.7,"o1":7.9},{"name":"M09","i1":8.0,"i2":4.7,"o1":6.8},{"name":"T_A","i1":9.0,"i2":8.2,"o1":5.2},{"name":"T_B","i1":8.2,"i2":9.1,"o1":5.0},{"name":"T_C","i1":9.3,"i2":7.5,"o1":4.8},{"name":"T_D","i1":8.7,"i2":7.8,"o1":5.8}],"units":{"T_C":{"target":"T_C","path_id":"path_000001","path_count":1483,"tc_ties":41,"o1":4.8,"metrics":{"tc":0.517972,"msc":0.243885,"cdir":0.517972,"dr":1.0},"path":[{"stage":0,"label":"Start","name":"T_C","x":9.3,"y":7.5,"efficiency":0.250416,"effort":null,"pareto":null},{"stage":1,"label":"Etap 1","name":"punkt etapu 1","x":9.26057,"y":2.563601,"efficiency":0.478494,"effort":0.243885,"pareto":true},{"stage":2,"label":"Etap 2","name":"punkt etapu 2","x":6.505659,"y":1.511246,"efficiency":0.811692,"effort":0.184673,"pareto":true},{"stage":3,"label":"Etap 3","name":"punkt etapu 3","x":4.838263,"y":1.330444,"efficiency":0.921998,"effort":0.089413,"pareto":true}],"fronts":{"1":[{"x":2.499375,"y":7.5,"efficiency":0.500995},{"x":4.693125,"y":4.012031,"efficiency":0.48011},{"x":9.3,"y":2.517188,"efficiency":0.487316},{"x":7.709531,"y":2.683281,"efficiency":0.476659},{"x":2.766645,"y":6.951731,"efficiency":0.486469},{"x":3.435282,"y":5.606272,"efficiency":0.474403},{"x":3.174687,"y":6.106221,"efficiency":0.475897},{"x":5.187695,"y":3.771938,"efficiency":0.475062},{"x":4.052185,"y":4.711429,"efficiency":0.477758},{"x":3.682856,"y":5.225434,"efficiency":0.476763},{"x":3.760967,"y":5.080862,"efficiency":0.478667},{"x":7.061695,"y":2.87335,"efficiency":0.478079},{"x":7.379116,"y":2.743012,"efficiency":0.480878},{"x":7.776807,"y":2.682828,"efficiency":0.474727},{"x":7.158376,"y":2.868384,"efficiency":0.47569},{"x":6.483089,"y":3.102219,"efficiency":0.47386},{"x":9.26057,"y":2.563601,"efficiency":0.478494},{"x":5.616105,"y":3.485081,"efficiency":0.476038},{"x":5.312452,"y":3.636004,"efficiency":0.478897},{"x":3.270924,"y":5.714265,"efficiency":0.479644},{"x":2.921617,"y":6.691589,"efficiency":0.480453},{"x":2.69989,"y":7.327187,"efficiency":0.480584},{"x":4.199489,"y":4.599338,"efficiency":0.473802},{"x":2.775909,"y":6.871998,"efficiency":0.488202},{"x":4.209261,"y":4.526771,"efficiency":0.476583},{"x":7.195038,"y":2.784482,"efficiency":0.482479},{"x":2.927163,"y":6.436531,"efficiency":0.488171},{"x":3.571365,"y":5.360703,"efficiency":0.4774},{"x":5.783366,"y":3.382363,"efficiency":0.475793},{"x":6.124272,"y":3.20049,"efficiency":0.475282},{"x":2.993695,"y":6.314844,"efficiency":0.485877},{"x":4.390748,"y":4.1115,"efficiency":0.486563},{"x":2.575182,"y":7.354166,"efficiency":0.491403},{"x":4.788446,"y":3.874292,"efficiency":0.485463}],"2":[{"x":4.035,"y":2.185,"efficiency":0.707055},{"x":5.175302,"y":1.855512,"efficiency":0.699046},{"x":6.611149,"y":0.899373,"efficiency":1.0},{"x":5.624737,"y":1.696068,"efficiency":0.723242},{"x":3.625615,"y":2.410199,"efficiency":0.712315},{"x":6.505659,"y":1.511246,"efficiency":0.811692},{"x":6.511622,"y":1.183363,"efficiency":1.0},{"x":4.691687,"y":1.915682,"efficiency":0.718171},{"x":3.167649,"y":2.520959,"efficiency":0.740651},{"x":1.784926,"y":2.546035,"efficiency":0.981018},{"x":3.463101,"y":2.416886,"efficiency":0.727218},{"x":4.565746,"y":1.953411,"efficiency":0.718631},{"x":5.467326,"y":1.754495,"efficiency":0.700745}],"3":[{"x":3.058068,"y":1.398774,"efficiency":1.0},{"x":4.838263,"y":1.330444,"efficiency":0.921998},{"x":0.556967,"y":1.414412,"efficiency":1.0},{"x":4.866198,"y":0.847925,"efficiency":1.0}]},"front_counts":{"1":34,"2":13,"3":4}},"T_B":{"target":"T_B","path_id":"path_000001","path_count":1523,"tc_ties":43,"o1":5.0,"metrics":{"tc":0.555881,"msc":0.268116,"cdir":0.555881,"dr":1.0},"path":[{"stage":0,"label":"Start","name":"T_B","x":8.2,"y":9.1,"efficiency":0.251256,"effort":null,"pareto":null},{"stage":1,"label":"Etap 1","name":"punkt etapu 1","x":2.65,"y":9.1,"efficiency":0.492207,"effort":0.268116,"pareto":true},{"stage":2,"label":"Etap 2","name":"punkt etapu 2","x":1.617383,"y":6.1022,"efficiency":0.806456,"effort":0.196836,"pareto":true},{"stage":3,"label":"Etap 3","name":"punkt etapu 3","x":1.243253,"y":4.61595,"efficiency":1.0,"effort":0.090929,"pareto":true}],"fronts":{"1":[{"x":2.65,"y":9.1,"efficiency":0.492207},{"x":8.2,"y":2.617188,"efficiency":0.488226},{"x":5.280287,"y":3.643481,"efficiency":0.499776},{"x":4.946805,"y":4.079708,"efficiency":0.484266},{"x":3.805887,"y":5.289439,"efficiency":0.485698},{"x":5.273861,"y":3.969581,"efficiency":0.477798},{"x":3.5533,"y":5.579311,"efficiency":0.48792},{"x":4.732073,"y":4.249661,"efficiency":0.482035},{"x":3.774493,"y":5.471972,"efficiency":0.479199},{"x":4.29345,"y":4.825773,"efficiency":0.477094},{"x":3.237568,"y":6.115237,"efficiency":0.489618},{"x":5.755483,"y":3.619979,"efficiency":0.480646},{"x":4.368078,"y":4.705102,"efficiency":0.478048},{"x":2.946798,"y":7.431561,"efficiency":0.474948},{"x":3.059018,"y":6.997708,"efficiency":0.478252},{"x":2.733683,"y":8.173019,"efficiency":0.477139},{"x":2.715589,"y":8.542728,"efficiency":0.480319},{"x":4.019638,"y":5.245648,"efficiency":0.474645},{"x":2.688983,"y":8.792208,"efficiency":0.485071},{"x":7.579751,"y":2.899704,"efficiency":0.480103},{"x":6.924042,"y":3.09624,"efficiency":0.481124},{"x":6.32067,"y":3.153281,"efficiency":0.493643},{"x":5.104713,"y":4.031642,"efficiency":0.480784},{"x":6.777334,"y":3.142965,"efficiency":0.481103},{"x":7.965826,"y":2.841968,"efficiency":0.474323},{"x":7.283319,"y":2.956067,"efficiency":0.48353},{"x":2.793625,"y":7.721,"efficiency":0.479537},{"x":2.825756,"y":7.716389,"efficiency":0.476875},{"x":3.261099,"y":5.697923,"efficiency":0.501093},{"x":2.881862,"y":7.558071,"efficiency":0.476768},{"x":5.277795,"y":3.79077,"efficiency":0.489586},{"x":6.069589,"y":3.430776,"efficiency":0.479954},{"x":4.395385,"y":4.382827,"efficiency":0.491381}],"2":[{"x":0.8877,"y":6.347108,"efficiency":1.0},{"x":1.617383,"y":6.1022,"efficiency":0.806456},{"x":0.990186,"y":6.264961,"efficiency":1.0},{"x":1.759743,"y":5.240419,"efficiency":0.741215},{"x":1.999468,"y":4.808393,"efficiency":0.715465},{"x":2.437217,"y":3.648717,"efficiency":0.729717},{"x":2.613286,"y":1.826525,"efficiency":1.0},{"x":2.075017,"y":4.781129,"efficiency":0.702794},{"x":2.587867,"y":3.22919,"efficiency":0.753574},{"x":2.413767,"y":3.9509,"efficiency":0.702156},{"x":2.588823,"y":2.913582,"efficiency":0.790769}],"3":[{"x":1.243253,"y":4.61595,"efficiency":1.0},{"x":1.499766,"y":3.384031,"efficiency":0.981391},{"x":1.609097,"y":1.726793,"efficiency":1.0},{"x":1.566628,"y":3.218999,"efficiency":0.977857}]},"front_counts":{"1":33,"2":11,"3":4}},"T_A":{"target":"T_A","path_id":"path_000001","path_count":2030,"tc_ties":48,"o1":5.2,"metrics":{"tc":0.54619,"msc":0.279682,"cdir":0.54619,"dr":1.0},"path":[{"stage":0,"label":"Start","name":"T_A","x":9.0,"y":8.2,"efficiency":0.26136,"effort":null,"pareto":null},{"stage":1,"label":"Etap 1","name":"punkt etapu 1","x":8.734181,"y":2.756462,"efficiency":0.482099,"effort":0.279682,"pareto":true},{"stage":2,"label":"Etap 2","name":"punkt etapu 2","x":6.482576,"y":1.61048,"efficiency":0.825151,"effort":0.164949,"pareto":true},{"stage":3,"label":"Etap 3","name":"punkt etapu 3","x":4.727463,"y":1.268349,"efficiency":1.0,"effort":0.101559,"pareto":true}],"fronts":{"1":[{"x":5.745,"y":3.829727,"efficiency":0.486305},{"x":4.7475,"y":4.393633,"efficiency":0.490916},{"x":2.7,"y":8.2,"efficiency":0.502415},{"x":5.914885,"y":3.669425,"efficiency":0.489727},{"x":6.636509,"y":3.219951,"efficiency":0.497305},{"x":4.155937,"y":5.335049,"efficiency":0.481323},{"x":6.218434,"y":3.558012,"efficiency":0.484409},{"x":8.116964,"y":2.81645,"efficiency":0.491247},{"x":4.168076,"y":5.133933,"efficiency":0.489644},{"x":6.625518,"y":3.3146,"efficiency":0.488932},{"x":3.820105,"y":5.677221,"efficiency":0.486058},{"x":3.620881,"y":5.962554,"efficiency":0.485182},{"x":2.968015,"y":7.595148,"efficiency":0.487074},{"x":3.347606,"y":6.706213,"efficiency":0.480935},{"x":3.438577,"y":6.205324,"efficiency":0.488046},{"x":3.104198,"y":7.297001,"efficiency":0.484234},{"x":2.891946,"y":8.006967,"efficiency":0.481344},{"x":4.327459,"y":4.959945,"efficiency":0.487878},{"x":3.61029,"y":6.069916,"efficiency":0.481027},{"x":7.385082,"y":3.018284,"efficiency":0.494006},{"x":3.540559,"y":6.10139,"efficiency":0.483764},{"x":6.988478,"y":3.188638,"efficiency":0.489922},{"x":5.320455,"y":4.03344,"efficiency":0.490646},{"x":4.870019,"y":4.311622,"efficiency":0.491188},{"x":8.734181,"y":2.756462,"efficiency":0.482099},{"x":7.959443,"y":2.855712,"efficiency":0.492221},{"x":6.546121,"y":3.391686,"efficiency":0.484287},{"x":4.086346,"y":5.407021,"efficiency":0.482249},{"x":4.208387,"y":5.012915,"efficiency":0.492741},{"x":4.390417,"y":4.790018,"efficiency":0.491814},{"x":3.200269,"y":7.091239,"efficiency":0.482116},{"x":5.125028,"y":4.251179,"efficiency":0.484537}],"2":[{"x":4.1175,"y":2.372969,"efficiency":0.729077},{"x":4.587485,"y":2.253491,"efficiency":0.714054},{"x":5.209071,"y":2.000087,"efficiency":0.72509},{"x":6.583557,"y":0.918021,"efficiency":1.0},{"x":5.639299,"y":1.819643,"efficiency":0.733958},{"x":3.72561,"y":2.627827,"efficiency":0.728244},{"x":6.482576,"y":1.61048,"efficiency":0.825151},{"x":6.488284,"y":1.239414,"efficiency":1.0},{"x":3.230519,"y":2.706182,"efficiency":0.764413},{"x":4.310229,"y":2.316115,"efficiency":0.719607},{"x":1.820352,"y":2.734561,"efficiency":1.0},{"x":3.622541,"y":2.635395,"efficiency":0.736791},{"x":5.541115,"y":1.885765,"efficiency":0.726902},{"x":2.999625,"y":2.718664,"efficiency":0.786608},{"x":2.443679,"y":2.732748,"efficiency":0.873788},{"x":4.115782,"y":2.41158,"efficiency":0.723637},{"x":4.874199,"y":2.191604,"efficiency":0.708517},{"x":3.538457,"y":2.704909,"efficiency":0.734404}],"3":[{"x":4.403929,"y":1.427398,"efficiency":0.937722},{"x":4.727463,"y":1.268349,"efficiency":1.0},{"x":1.674699,"y":1.604822,"efficiency":1.0},{"x":4.754758,"y":0.73083,"efficiency":1.0},{"x":4.118669,"y":1.460036,"efficiency":0.957309},{"x":2.102918,"y":1.559355,"efficiency":1.0}]},"front_counts":{"1":32,"2":18,"3":6}},"T_D":{"target":"T_D","path_id":"path_000001","path_count":2554,"tc_ties":75,"o1":5.8,"metrics":{"tc":0.503934,"msc":0.241517,"cdir":0.503934,"dr":1.0},"path":[{"stage":0,"label":"Start","name":"T_D","x":8.7,"y":7.8,"efficiency":0.304435,"effort":null,"pareto":null},{"stage":1,"label":"Etap 1","name":"punkt etapu 1","x":8.512093,"y":3.058236,"efficiency":0.512992,"effort":0.241517,"pareto":true},{"stage":2,"label":"Etap 2","name":"punkt etapu 2","x":7.748342,"y":2.009728,"efficiency":0.737524,"effort":0.088294,"pareto":true},{"stage":3,"label":"Etap 3","name":"punkt etapu 3","x":5.043367,"y":1.123393,"efficiency":1.0,"effort":0.174123,"pareto":true}],"fronts":{"1":[{"x":4.486875,"y":5.343438,"efficiency":0.515538},{"x":3.0825,"y":7.8,"efficiency":0.525858},{"x":5.08875,"y":4.641563,"efficiency":0.515243},{"x":3.48375,"y":6.659453,"efficiency":0.52532},{"x":3.955681,"y":6.14613,"efficiency":0.511306},{"x":5.573292,"y":4.249915,"efficiency":0.520769},{"x":7.199775,"y":3.475686,"efficiency":0.512851},{"x":5.927971,"y":4.160491,"efficiency":0.511833},{"x":3.562954,"y":6.62533,"efficiency":0.519279},{"x":3.416524,"y":7.306328,"efficiency":0.511457},{"x":6.2271,"y":3.957574,"efficiency":0.512656},{"x":3.634389,"y":6.472597,"efficiency":0.517645},{"x":4.83166,"y":4.752663,"efficiency":0.521552},{"x":6.44924,"y":3.586798,"efficiency":0.527965},{"x":4.650906,"y":5.097135,"efficiency":0.516788},{"x":3.468653,"y":6.979233,"efficiency":0.516777},{"x":3.265877,"y":7.624546,"efficiency":0.51495},{"x":3.872442,"y":6.291879,"efficiency":0.509759},{"x":4.180509,"y":5.594708,"efficiency":0.522809},{"x":4.579007,"y":5.176126,"efficiency":0.517564},{"x":7.413347,"y":3.409265,"efficiency":0.512739},{"x":3.379881,"y":7.411904,"efficiency":0.511462},{"x":4.381089,"y":5.547242,"efficiency":0.512704},{"x":6.848897,"y":3.515577,"efficiency":0.519282},{"x":7.849148,"y":3.098883,"efficiency":0.528551},{"x":5.351984,"y":4.499161,"efficiency":0.513616},{"x":8.512093,"y":3.058236,"efficiency":0.512992},{"x":4.176662,"y":5.857787,"efficiency":0.511012},{"x":5.537256,"y":4.432669,"efficiency":0.510303},{"x":5.143408,"y":4.553697,"efficiency":0.518741},{"x":4.819326,"y":4.910289,"efficiency":0.51506}],"2":[{"x":4.336406,"y":2.711406,"efficiency":0.742175},{"x":7.748342,"y":2.009728,"efficiency":0.737524},{"x":7.845965,"y":0.826807,"efficiency":1.0},{"x":7.251528,"y":2.031909,"efficiency":0.729473},{"x":7.749492,"y":1.473217,"efficiency":1.0},{"x":5.984384,"y":2.217512,"efficiency":0.717711},{"x":7.754945,"y":1.126827,"efficiency":1.0},{"x":1.484355,"y":3.058192,"efficiency":1.0},{"x":5.334779,"y":2.431248,"efficiency":0.716339},{"x":5.569568,"y":2.236262,"efficiency":0.737926},{"x":5.205027,"y":2.440857,"efficiency":0.721857},{"x":4.349534,"y":2.657043,"efficiency":0.748474},{"x":3.926318,"y":3.044243,"efficiency":0.732515},{"x":4.166151,"y":2.748368,"efficiency":0.751978},{"x":5.363705,"y":2.430661,"efficiency":0.714851},{"x":3.959512,"y":2.906759,"efficiency":0.748232},{"x":5.164352,"y":2.458614,"efficiency":0.720999},{"x":4.284744,"y":2.743526,"efficiency":0.742274}],"3":[{"x":3.271123,"y":1.705334,"efficiency":1.0},{"x":3.770732,"y":1.474533,"efficiency":1.0},{"x":1.532752,"y":2.007057,"efficiency":1.0},{"x":4.23429,"y":1.360501,"efficiency":1.0},{"x":1.953682,"y":1.952239,"efficiency":1.0},{"x":5.043367,"y":1.123393,"efficiency":1.0},{"x":2.383239,"y":1.909121,"efficiency":1.0}]},"front_counts":{"1":31,"2":18,"3":7}},"M07":{"target":"M07","path_id":"path_000001","path_count":4704,"tc_ties":25,"o1":6.9,"metrics":{"tc":0.244041,"msc":0.13044,"cdir":0.244041,"dr":1.0},"path":[{"stage":0,"label":"Start","name":"M07","x":7.2,"y":6.1,"efficiency":0.452182,"effort":null,"pareto":null},{"stage":1,"label":"Etap 1","name":"punkt etapu 1","x":7.2,"y":3.439023,"efficiency":0.614018,"effort":0.13044,"pareto":true},{"stage":2,"label":"Etap 2","name":"punkt etapu 2","x":7.2,"y":2.307344,"efficiency":0.76544,"effort":0.055474,"pareto":true},{"stage":3,"label":"Etap 3","name":"punkt etapu 3","x":6.409918,"y":1.900203,"efficiency":0.927971,"effort":0.058126,"pareto":true}],"fronts":{"1":[{"x":5.97,"y":4.1425,"efficiency":0.608235},{"x":3.97125,"y":6.1,"efficiency":0.60963},{"x":7.2,"y":3.439023,"efficiency":0.614018},{"x":5.278125,"y":4.570703,"efficiency":0.60913},{"x":6.2775,"y":3.897813,"efficiency":0.612027},{"x":5.459443,"y":4.236459,"efficiency":0.626436},{"x":4.66928,"y":4.921361,"efficiency":0.623137},{"x":5.685951,"y":4.174109,"efficiency":0.619869},{"x":5.322364,"y":4.465324,"efficiency":0.615126},{"x":4.791111,"y":4.866676,"efficiency":0.617166},{"x":4.063437,"y":5.705533,"efficiency":0.6245},{"x":4.602201,"y":5.260573,"efficiency":0.609491},{"x":6.672561,"y":3.648056,"efficiency":0.611918},{"x":5.767269,"y":4.162169,"efficiency":0.616721},{"x":6.463984,"y":3.788256,"efficiency":0.61133},{"x":6.312274,"y":3.857508,"efficiency":0.613442},{"x":6.320743,"y":3.835279,"efficiency":0.614758},{"x":4.396748,"y":5.554572,"efficiency":0.608434},{"x":7.189776,"y":3.446204,"efficiency":0.613595},{"x":5.409364,"y":4.418664,"efficiency":0.614448},{"x":6.907415,"y":3.476792,"efficiency":0.619973},{"x":4.930764,"y":4.757316,"efficiency":0.612974},{"x":6.292959,"y":3.893959,"efficiency":0.611564},{"x":6.638838,"y":3.672397,"efficiency":0.611693},{"x":4.181414,"y":5.703259,"efficiency":0.615912},{"x":4.017754,"y":5.891989,"efficiency":0.617537},{"x":4.004926,"y":6.019518,"efficiency":0.611537},{"x":4.823228,"y":4.859404,"efficiency":0.615222},{"x":5.168463,"y":4.598364,"efficiency":0.61238},{"x":6.043662,"y":4.094404,"efficiency":0.608332},{"x":6.571622,"y":3.753578,"efficiency":0.608728}],"2":[{"x":4.816875,"y":3.255508,"efficiency":0.764205},{"x":7.2,"y":2.307344,"efficiency":0.76544},{"x":6.085312,"y":2.552031,"efficiency":0.783984},{"x":4.529956,"y":3.421388,"efficiency":0.766211},{"x":6.552627,"y":2.517708,"efficiency":0.764571},{"x":5.081591,"y":2.889458,"efficiency":0.788898},{"x":6.03533,"y":2.646668,"efficiency":0.770435},{"x":6.767955,"y":2.403944,"efficiency":0.772223},{"x":5.627661,"y":2.793456,"efficiency":0.767472},{"x":5.737964,"y":2.653207,"efficiency":0.785544},{"x":6.568434,"y":2.511026,"efficiency":0.764849},{"x":7.107174,"y":2.314744,"efficiency":0.76913},{"x":3.373781,"y":3.431744,"efficiency":0.875913},{"x":4.99028,"y":2.977283,"efficiency":0.785079},{"x":4.038057,"y":3.429323,"efficiency":0.805156}],"3":[{"x":4.74,"y":2.185,"efficiency":0.952675},{"x":5.21136,"y":2.116455,"efficiency":0.932239},{"x":6.409918,"y":1.900203,"efficiency":0.927971},{"x":6.529237,"y":1.555539,"efficiency":1.0},{"x":4.106106,"y":2.277398,"efficiency":0.987778},{"x":5.830962,"y":1.915113,"efficiency":0.933477},{"x":6.55022,"y":1.200118,"efficiency":1.0},{"x":4.595954,"y":2.237052,"efficiency":0.951023},{"x":5.678771,"y":1.985739,"efficiency":0.927953},{"x":5.357138,"y":2.084365,"efficiency":0.928762},{"x":2.575123,"y":2.298381,"efficiency":1.0},{"x":5.005353,"y":2.138488,"efficiency":0.943064},{"x":3.084256,"y":2.288167,"efficiency":1.0},{"x":4.223025,"y":2.263925,"efficiency":0.97563},{"x":4.722376,"y":2.211073,"efficiency":0.947411}]},"front_counts":{"1":31,"2":15,"3":15}}}};
+    const plot = document.getElementById('plot');
+    const tableBody = document.getElementById('path-table');
+    const resultLine = document.getElementById('result-line');
+    const colors = {1: '#df5a56', 2: '#3978b5', 3: '#43a06b'};
+    const symbols = {1: 'circle-open', 2: 'square-open', 3: 'diamond-open'};
+
+    function format(value, digits = 4) {
+      if (value === null || value === undefined) return '–';
+      return Number(value).toFixed(digits).replace('.', ',');
+    }
+
+    function frontTrace(unit, stage) {
+      const points = [...unit.fronts[String(stage)]].sort((a, b) => a.x - b.x);
+      return {
+        type: 'scatter', mode: 'lines+markers', name: `Front etapu ${stage}`,
+        x: points.map(point => point.x), y: points.map(point => point.y),
+        customdata: points.map(point => point.efficiency),
+        line: {color: colors[stage], width: 2},
+        marker: {color: colors[stage], size: 8, symbol: symbols[stage], line: {color: colors[stage], width: 2}},
+        opacity: 0.88,
+        hovertemplate: `Front etapu ${stage}<br>i1=%{x:.4f}<br>i2=%{y:.4f}<br>efektywność=%{customdata:.4f}<extra></extra>`
+      };
+    }
+
+    function pathTraces(unit) {
+      return [
+        {
+          type: 'scatter', mode: 'lines', name: 'Minimalna ścieżka',
+          x: unit.path.map(point => point.x), y: unit.path.map(point => point.y),
+          line: {color: '#17324a', width: 4}, hoverinfo: 'skip'
+        },
+        {
+          type: 'scatter', mode: 'markers+text', name: 'Wybrane punkty',
+          x: unit.path.map(point => point.x), y: unit.path.map(point => point.y),
+          text: ['Start', '1', '2', '3'],
+          textposition: ['top center', 'top center', 'top right', 'bottom right'],
+          customdata: unit.path.map(point => [point.label, point.efficiency]),
+          marker: {
+            color: ['#f0aa18', colors[1], colors[2], colors[3]],
+            symbol: ['diamond', 'circle', 'square', 'diamond'],
+            size: [16, 15, 15, 16], line: {color: '#17324a', width: 2}
+          },
+          hovertemplate: '%{customdata[0]}<br>i1=%{x:.4f}<br>i2=%{y:.4f}<br>efektywność=%{customdata[1]:.4f}<extra></extra>'
+        }
+      ];
+    }
+
+    function renderTable(unit) {
+      tableBody.innerHTML = unit.path.map(point => `
+        <tr>
+          <td>${point.stage}</td><td>${point.name}</td>
+          <td>${format(point.x)}</td><td>${format(point.y)}</td>
+          <td>${format(point.efficiency)}</td><td>${format(point.effort, 6)}</td>
+          <td class="status">${point.pareto === null ? 'start' : 'Pareto-min.'}</td>
+        </tr>`).join('');
+      resultLine.innerHTML = `
+        <span>Jednostka: <strong>${unit.target}</strong></span>
+        <span>stałe o1: <strong>${format(unit.o1)}</strong></span>
+        <span>TC: <strong>${format(unit.metrics.tc, 6)}</strong></span>
+        <span>MSC: <strong>${format(unit.metrics.msc, 6)}</strong></span>
+        <span>DR: <strong>${format(unit.metrics.dr, 3)}</strong></span>
+        <span>sprawdzone ścieżki: <strong>${unit.path_count.toLocaleString('pl-PL')}</strong></span>`;
+    }
+
+    function render(target) {
+      const unit = DATA.units[target];
+      const reference = {
+        type: 'scatter', mode: 'markers', name: 'Jednostki referencyjne',
+        x: DATA.dmus.map(point => point.i1), y: DATA.dmus.map(point => point.i2),
+        text: DATA.dmus.map(point => point.name), customdata: DATA.dmus.map(point => point.o1),
+        marker: {color: '#8a99a8', size: 8, opacity: 0.52},
+        hovertemplate: '%{text}<br>i1=%{x:.3f}<br>i2=%{y:.3f}<br>o1=%{customdata:.3f}<extra></extra>'
+      };
+      const traces = [reference, frontTrace(unit, 1), frontTrace(unit, 2), frontTrace(unit, 3), ...pathTraces(unit)];
+      const frameNames = unit.path.map(point => `${target}-${point.stage}`);
+      const frames = unit.path.map((point, index) => ({
+        name: frameNames[index], traces: [4, 5], data: [
+          {x: unit.path.slice(0, index + 1).map(item => item.x), y: unit.path.slice(0, index + 1).map(item => item.y)},
+          {
+            x: unit.path.slice(0, index + 1).map(item => item.x),
+            y: unit.path.slice(0, index + 1).map(item => item.y),
+            text: ['Start', '1', '2', '3'].slice(0, index + 1),
+            customdata: unit.path.slice(0, index + 1).map(item => [item.label, item.efficiency]),
+            marker: {
+              color: ['#f0aa18', colors[1], colors[2], colors[3]].slice(0, index + 1),
+              symbol: ['diamond', 'circle', 'square', 'diamond'].slice(0, index + 1),
+              size: [16, 15, 15, 16].slice(0, index + 1), line: {color: '#17324a', width: 2}
+            }
+          }
+        ]
+      }));
+      const layout = {
+        autosize: true, margin: {l: 64, r: 24, t: 34, b: 124},
+        paper_bgcolor: '#ffffff', plot_bgcolor: '#ffffff', font: {color: '#17324a'},
+        title: {text: `Jednostka ${target} · o1 = ${format(unit.o1)}`, x: 0.01, xanchor: 'left'},
+        hovermode: 'closest', dragmode: 'pan',
+        legend: {orientation: 'h', x: 0.5, xanchor: 'center', y: -0.16, yanchor: 'top'},
+        xaxis: {title: {text: 'Wejście i1'}, range: [-0.5, 9.8], zeroline: false, gridcolor: '#d7e0e7', linecolor: '#d7e0e7', mirror: true, constrain: 'domain'},
+        yaxis: {title: {text: 'Wejście i2'}, range: [-0.1, 9.8], zeroline: false, gridcolor: '#d7e0e7', linecolor: '#d7e0e7', mirror: true, scaleanchor: 'x', scaleratio: 1},
+        updatemenus: [{
+          type: 'buttons', direction: 'left', x: 0, xanchor: 'left', y: -0.27, yanchor: 'top', showactive: false,
+          buttons: [
+            {label: 'Odtwórz ścieżkę', method: 'animate', args: [frameNames, {fromcurrent: false, frame: {duration: 800, redraw: false}, transition: {duration: 500}, mode: 'immediate'}]},
+            {label: 'Pauza', method: 'animate', args: [[null], {frame: {duration: 0, redraw: false}, transition: {duration: 0}, mode: 'immediate'}]}
+          ]
+        }],
+        sliders: [{
+          active: 3, x: 0.32, len: 0.68, y: -0.265, yanchor: 'top', currentvalue: {prefix: 'Widok: '},
+          steps: ['Start', 'Etap 1', 'Etap 2', 'Etap 3'].map((label, index) => ({
+            label, method: 'animate', args: [[frameNames[index]], {mode: 'immediate', frame: {duration: 400, redraw: false}, transition: {duration: 300}}]
+          }))
+        }]
+      };
+      const config = {responsive: true, scrollZoom: true, displaylogo: false, modeBarButtonsToRemove: ['lasso2d', 'select2d'], toImageButtonOptions: {format: 'png', filename: `minimalna-sciezka-${target}`, scale: 2}};
+
+      const existingFrameCount = plot._transitionData?._frames?.length || 0;
+      const clearFrames = existingFrameCount
+        ? Plotly.deleteFrames(plot, Array.from({length: existingFrameCount}, (_, index) => index))
+        : Promise.resolve();
+      clearFrames
+        .then(() => Plotly.react(plot, traces, layout, config))
+        .then(() => Plotly.addFrames(plot, frames));
+      renderTable(unit);
+    }
+
+    document.querySelectorAll('.unit-button').forEach(button => {
+      button.addEventListener('click', () => {
+        document.querySelectorAll('.unit-button').forEach(item => {
+          const active = item === button;
+          item.classList.toggle('active', active);
+          item.setAttribute('aria-pressed', String(active));
+        });
+        render(button.dataset.target);
+      });
+    });
+    render(DATA.order[0]);
+  </script>
+</body>
+</html>
