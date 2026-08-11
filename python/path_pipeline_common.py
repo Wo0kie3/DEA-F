@@ -3,7 +3,9 @@ import os
 from datetime import datetime
 from itertools import product
 from pathlib import Path
+from typing import Callable
 
+import numpy as np
 import pandas as pd
 
 
@@ -331,7 +333,37 @@ def linear_milestones(start_value: float, target_value: float, stages: int) -> l
     ]
 
 
-def paths_to_frame(paths: list[list[str]]) -> pd.DataFrame:
+def paths_to_frame(paths: list[list[str]], state_data: pd.DataFrame | None = None) -> pd.DataFrame:
+    state_lookup = {}
+    passthrough_fields = [
+        "state_type",
+        "best_efficiency",
+        "worst_efficiency",
+        "best_rank",
+        "worst_rank",
+        "score_width",
+        "rank_width",
+        "milestone_gap",
+        "effort_from_start",
+        "peer_refs",
+        "peer_set",
+        "peers",
+        "reference_set",
+        "reference_refs",
+        "candidate_necessary_over_refs",
+        "candidate_possible_over_refs",
+        "reference_necessary_over_candidate_refs",
+        "reference_possible_over_candidate_refs",
+    ]
+    io_cols = []
+    if state_data is not None and "name" in state_data.columns:
+        inputs, outputs = get_io_columns(state_data)
+        io_cols = inputs + outputs
+        state_lookup = {
+            str(state["name"]): state
+            for _, state in state_data.iterrows()
+        }
+
     rows = []
     for path_idx, path in enumerate(paths, start=1):
         row = {
@@ -339,7 +371,18 @@ def paths_to_frame(paths: list[list[str]]) -> pd.DataFrame:
             "path_length": len(path) - 1,
         }
         for stage_idx, name in enumerate(path):
-            row[f"stage_{stage_idx:02d}_name"] = name
+            prefix = f"stage_{stage_idx:02d}"
+            row[f"{prefix}_name"] = name
+            row[f"stage_{stage_idx:02d}_state_type"] = "real"
+            state = state_lookup.get(str(name))
+            if state is None:
+                continue
+            for field in passthrough_fields:
+                if field in state and pd.notna(state[field]):
+                    row[f"{prefix}_{field}"] = state[field]
+            for col in io_cols:
+                if col in state and pd.notna(state[col]):
+                    row[f"{prefix}_{col}"] = state[col]
         rows.append(row)
     return pd.DataFrame(rows)
 
@@ -423,6 +466,35 @@ def _axis_values(start: float, end: float, step_pct: float, step_abs: float | No
     if start > end:
         unique.reverse()
     return unique
+
+
+def candidate_grid_steps(
+    df: pd.DataFrame,
+    target_row: pd.Series,
+    columns_to_modify: list[str],
+    pct_above: float,
+    step_pct: float,
+    step_abs: float | None,
+) -> dict[str, float]:
+    inputs, outputs = get_io_columns(df)
+    steps = {}
+    for col in columns_to_modify:
+        current = float(target_row[col])
+        observed = df[col].astype(float)
+        if col in inputs:
+            end = max(0.0, float(observed.min()) * (1.0 - pct_above / 100.0))
+        elif col in outputs:
+            end = float(observed.max()) * (1.0 + pct_above / 100.0)
+        else:
+            raise ValueError(f"Column '{col}' is neither an input nor an output.")
+
+        span = abs(float(end) - current)
+        if step_abs is not None:
+            step = float(step_abs)
+        else:
+            step = span * (float(step_pct) / 100.0)
+        steps[col] = max(step, 1e-12)
+    return steps
 
 
 def generate_attainable_fictive_candidates(
@@ -511,15 +583,38 @@ def front_requirement_mask(metrics: pd.DataFrame, front_components: list[list[st
     return metrics["candidate_necessary_over_refs"].apply(satisfies)
 
 
-def add_effort_columns(df: pd.DataFrame, target_row: pd.Series, io_cols: list[str]) -> pd.DataFrame:
-    out = df.copy()
+def normalization_ranges_from_frame(
+    frame: pd.DataFrame,
+    io_cols: list[str],
+    fallback_row: pd.Series | None = None,
+) -> dict[str, float]:
     ranges = {}
     for col in io_cols:
-        values = out[col].astype(float)
-        span = float(values.max() - values.min())
+        values = pd.to_numeric(frame[col], errors="coerce").dropna()
+        span = float(values.max() - values.min()) if not values.empty else 0.0
         if span <= 1e-12:
-            span = max(abs(float(target_row[col])), 1.0)
+            fallback = (
+                abs(float(fallback_row[col]))
+                if fallback_row is not None and col in fallback_row
+                else 0.0
+            )
+            span = max(fallback, 1.0)
         ranges[col] = span
+    return ranges
+
+
+def add_effort_columns(
+    df: pd.DataFrame,
+    target_row: pd.Series,
+    io_cols: list[str],
+    normalization_ranges: dict[str, float] | None = None,
+) -> pd.DataFrame:
+    out = df.copy()
+    ranges = normalization_ranges or normalization_ranges_from_frame(
+        out,
+        io_cols,
+        fallback_row=target_row,
+    )
 
     effort = []
     for _, row in out.iterrows():
@@ -541,14 +636,144 @@ def is_attainable_transition(previous: pd.Series, current: pd.Series, inputs: li
     return True
 
 
+def transition_effort(
+    previous: pd.Series,
+    current: pd.Series,
+    inputs: list[str],
+    outputs: list[str],
+    normalization_ranges: dict[str, float],
+) -> float:
+    factors = [*inputs, *outputs]
+    if not factors:
+        return 0.0
+
+    total = 0.0
+    for col in inputs:
+        change = max(float(previous[col]) - float(current[col]), 0.0)
+        total += change / normalization_ranges[col]
+    for col in outputs:
+        change = max(float(current[col]) - float(previous[col]), 0.0)
+        total += change / normalization_ranges[col]
+    return total / len(factors)
+
+
+def prune_minimal_transition_front(
+    frame: pd.DataFrame,
+    previous: pd.Series,
+    inputs: list[str],
+    outputs: list[str],
+    tolerance: float = 1e-9,
+) -> pd.DataFrame:
+    if frame.empty:
+        return frame.copy()
+
+    changes = []
+    for _, candidate in frame.iterrows():
+        changes.append(
+            [
+                *[
+                    max(float(previous[col]) - float(candidate[col]), 0.0)
+                    for col in inputs
+                ],
+                *[
+                    max(float(candidate[col]) - float(previous[col]), 0.0)
+                    for col in outputs
+                ],
+            ]
+        )
+
+    if not changes or not changes[0]:
+        return frame.copy().reset_index(drop=True)
+
+    values = np.asarray(changes, dtype=float)
+    keep = np.ones(len(values), dtype=bool)
+    for idx, value in enumerate(values):
+        no_more_change = np.all(values <= value + tolerance, axis=1)
+        strictly_less_change = np.any(values < value - tolerance, axis=1)
+        no_more_change[idx] = False
+        if np.any(no_more_change & strictly_less_change):
+            keep[idx] = False
+
+    return frame.loc[keep].copy().reset_index(drop=True)
+
+
+def select_transition_candidates(
+    previous: pd.Series,
+    candidates: pd.DataFrame,
+    inputs: list[str],
+    outputs: list[str],
+    normalization_ranges: dict[str, float],
+    points_per_transition: int | None = None,
+    minimal_inputs: list[str] | None = None,
+    minimal_outputs: list[str] | None = None,
+    transition_predicate: Callable[[pd.Series, pd.Series], bool] | None = None,
+) -> pd.DataFrame:
+    eligible_indices = []
+    for idx, candidate in candidates.iterrows():
+        if not is_attainable_transition(previous, candidate, inputs, outputs):
+            continue
+        if transition_predicate is not None and not transition_predicate(previous, candidate):
+            continue
+        eligible_indices.append(idx)
+
+    eligible = candidates.loc[eligible_indices].copy().reset_index(drop=True)
+    eligible_count = len(eligible)
+    if eligible.empty:
+        return eligible
+
+    front = prune_minimal_transition_front(
+        eligible,
+        previous=previous,
+        inputs=inputs if minimal_inputs is None else minimal_inputs,
+        outputs=outputs if minimal_outputs is None else minimal_outputs,
+    )
+    front_count = len(front)
+    front["effort_from_previous"] = front.apply(
+        lambda candidate: transition_effort(
+            previous,
+            candidate,
+            inputs,
+            outputs,
+            normalization_ranges,
+        ),
+        axis=1,
+    )
+    front["transition_reference_name"] = str(previous.get("name", ""))
+    front["transition_eligible_count"] = eligible_count
+    front["transition_front_size"] = front_count
+
+    sort_columns = [
+        col
+        for col in ["effort_from_previous", "milestone_gap", "name"]
+        if col in front.columns
+    ]
+    if sort_columns:
+        front = front.sort_values(sort_columns, kind="stable").reset_index(drop=True)
+    if points_per_transition is not None and points_per_transition >= 0:
+        front = front.head(points_per_transition).copy()
+    front["transition_selected_count"] = len(front)
+    return front.reset_index(drop=True)
+
+
 def enumerate_state_paths(
     start_row: pd.Series,
     stage_candidates: list[pd.DataFrame],
     inputs: list[str],
     outputs: list[str],
     max_paths: int | None,
+    points_per_transition: int | None = None,
+    normalization_ranges: dict[str, float] | None = None,
+    minimal_inputs: list[str] | None = None,
+    minimal_outputs: list[str] | None = None,
+    transition_predicate: Callable[[pd.Series, pd.Series], bool] | None = None,
+    transition_log: list[dict] | None = None,
 ) -> list[list[pd.Series]]:
     paths = []
+    ranges = normalization_ranges or {
+        col: max(abs(float(start_row[col])), 1.0)
+        for col in [*inputs, *outputs]
+    }
+    selection_cache = {}
 
     def dfs(stage_idx: int, current_path: list[pd.Series]):
         if max_paths is not None and len(paths) >= max_paths:
@@ -558,12 +783,36 @@ def enumerate_state_paths(
             return
 
         previous = current_path[-1]
-        candidates = stage_candidates[stage_idx]
-        for _, candidate in candidates.iterrows():
-            if is_attainable_transition(previous, candidate, inputs, outputs):
-                current_path.append(candidate)
-                dfs(stage_idx + 1, current_path)
-                current_path.pop()
+        cache_key = (
+            stage_idx,
+            str(previous.get("name", "")),
+            *[float(previous[col]) for col in [*inputs, *outputs]],
+        )
+        if cache_key not in selection_cache:
+            selected = select_transition_candidates(
+                previous=previous,
+                candidates=stage_candidates[stage_idx],
+                inputs=inputs,
+                outputs=outputs,
+                normalization_ranges=ranges,
+                points_per_transition=points_per_transition,
+                minimal_inputs=minimal_inputs,
+                minimal_outputs=minimal_outputs,
+                transition_predicate=transition_predicate,
+            )
+            selection_cache[cache_key] = selected
+            if transition_log is not None:
+                for _, candidate in selected.iterrows():
+                    record = candidate.to_dict()
+                    record["stage"] = stage_idx + 1
+                    transition_log.append(record)
+
+        for _, candidate in selection_cache[cache_key].iterrows():
+            current_path.append(candidate)
+            dfs(stage_idx + 1, current_path)
+            current_path.pop()
+            if max_paths is not None and len(paths) >= max_paths:
+                break
 
     dfs(0, [start_row])
     return paths
@@ -590,6 +839,20 @@ def state_paths_to_frame(paths: list[list[pd.Series]], io_cols: list[str]) -> pd
                 "rank_width",
                 "milestone_gap",
                 "effort_from_start",
+                "effort_from_previous",
+                "transition_reference_name",
+                "transition_eligible_count",
+                "transition_front_size",
+                "transition_selected_count",
+                "peer_refs",
+                "peer_set",
+                "peers",
+                "reference_set",
+                "reference_refs",
+                "candidate_necessary_over_refs",
+                "candidate_possible_over_refs",
+                "reference_necessary_over_candidate_refs",
+                "reference_possible_over_candidate_refs",
             ]:
                 if metric in state:
                     row[f"{prefix}_{metric}"] = state[metric]

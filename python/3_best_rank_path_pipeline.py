@@ -2,17 +2,21 @@ import argparse
 
 import pandas as pd
 
+from candidate_refinement import refine_numeric_goal_candidates
 from java_runner import (
     export_candidate_robust_metrics_with_java,
     export_extreme_ranks_with_java,
 )
+from path_metrics import write_path_metrics
 from path_pipeline_common import (
     add_effort_columns,
     add_real_state_type,
+    candidate_grid_steps,
     create_run_output_dir,
     enumerate_state_paths,
     generate_attainable_fictive_candidates,
     get_io_columns,
+    normalization_ranges_from_frame,
     parse_columns_arg,
     path_for_java,
     rank_milestones,
@@ -48,6 +52,17 @@ def parse_args():
     )
     parser.add_argument("--maven-executable", default="mvn")
     parser.add_argument("--max-paths", type=int, default=None)
+    parser.add_argument("--refine-fictive-candidates", action="store_true")
+    parser.add_argument("--refine-iterations", type=int, default=8)
+    parser.add_argument("--refine-max-seeds", type=int, default=20)
+    parser.add_argument("--local-search-samples", type=int, default=0)
+    parser.add_argument("--local-search-step-multiplier", type=float, default=1.0)
+    parser.add_argument("--local-search-random-state", type=int, default=42)
+    parser.add_argument(
+        "--local-search-sampling",
+        choices=["random", "stratified"],
+        default="random",
+    )
     return parser.parse_args()
 
 
@@ -74,16 +89,6 @@ def normalize_rank_metrics(df_ranks: pd.DataFrame) -> pd.DataFrame:
     return metrics
 
 
-def limit_stage(frame: pd.DataFrame, limit: int | None) -> pd.DataFrame:
-    frame = frame.sort_values(
-        by=["milestone_gap", "effort_from_start", "name"],
-        ascending=[True, True, True],
-    ).reset_index(drop=True)
-    if limit is not None and limit >= 0:
-        frame = frame.head(limit).copy()
-    return frame
-
-
 def main():
     args = parse_args()
     run_dir = create_run_output_dir(args.output_dir, "best_rank_path")
@@ -95,7 +100,20 @@ def main():
     inputs, outputs = get_io_columns(df_input)
     io_cols = inputs + outputs
     target_row = df_input[df_input["name"].astype(str) == args.target].iloc[0].copy()
+    normalization_ranges = normalization_ranges_from_frame(
+        df_input,
+        io_cols,
+        fallback_row=target_row,
+    )
     columns_to_modify = parse_columns_arg(args.columns, io_cols)
+    grid_steps = candidate_grid_steps(
+        df=df_input,
+        target_row=target_row,
+        columns_to_modify=columns_to_modify,
+        pct_above=args.pct_above,
+        step_pct=args.step_pct,
+        step_abs=args.step_abs,
+    )
 
     ranks_csv = run_dir / "extreme_ranks.csv"
     export_extreme_ranks_with_java(
@@ -108,7 +126,12 @@ def main():
 
     real_metrics = normalize_rank_metrics(pd.read_csv(ranks_csv))
     real_metrics = add_real_state_type(real_metrics[["name", "best_rank", "worst_rank", "rank_width"]], df_input)
-    real_metrics = add_effort_columns(real_metrics, target_row, io_cols)
+    real_metrics = add_effort_columns(
+        real_metrics,
+        target_row,
+        io_cols,
+        normalization_ranges=normalization_ranges,
+    )
     real_metrics.to_csv(run_dir / "rank_metrics.csv", index=False)
 
     fictive_metrics = pd.DataFrame()
@@ -137,7 +160,12 @@ def main():
             maven_executable=args.maven_executable,
         )
         fictive_metrics = pd.read_csv(candidate_metrics_csv)
-        fictive_metrics = add_effort_columns(fictive_metrics, target_row, io_cols)
+        fictive_metrics = add_effort_columns(
+            fictive_metrics,
+            target_row,
+            io_cols,
+            normalization_ranges=normalization_ranges,
+        )
         fictive_metrics.to_csv(run_dir / "fictive_rank_metrics.csv", index=False)
 
     start_best_rank = int(real_metrics.loc[real_metrics["name"] == args.target, "best_rank"].iloc[0])
@@ -160,12 +188,11 @@ def main():
 
     stage_candidates = []
     for stage_idx in range(1, args.stages + 1):
-        prev_milestone = milestones[stage_idx - 1]
         current_milestone = milestones[stage_idx]
         frames = []
 
         if args.mode in {"real", "mixed"}:
-            eligible_real = real_metrics[real_metrics["best_rank"] <= prev_milestone].copy()
+            eligible_real = real_metrics[real_metrics["best_rank"] <= current_milestone].copy()
             if not eligible_real.empty:
                 eligible_real["milestone_target"] = current_milestone
                 eligible_real["milestone_gap"] = (
@@ -181,25 +208,84 @@ def main():
                 eligible_fictive["milestone_gap"] = (
                     eligible_fictive["best_rank"] - current_milestone
                 ).abs()
+                if args.refine_fictive_candidates:
+                    eligible_fictive = refine_numeric_goal_candidates(
+                        seed_metrics=eligible_fictive,
+                        target_row=target_row,
+                        io_cols=io_cols,
+                        inputs=inputs,
+                        outputs=outputs,
+                        metric_col="best_rank",
+                        threshold=current_milestone,
+                        direction="lower",
+                        run_dir=run_dir,
+                        reference_csv=args.input,
+                        java_entry=args.java_entry,
+                        main_class=args.candidate_metrics_main_class,
+                        maven_executable=args.maven_executable,
+                        name_prefix=f"stage_{stage_idx:02d}_rank",
+                        iterations=args.refine_iterations,
+                        max_seed_candidates=args.refine_max_seeds,
+                        search_columns=columns_to_modify,
+                        local_step_by_column=grid_steps,
+                        local_random_samples=args.local_search_samples,
+                        local_random_step_multiplier=args.local_search_step_multiplier,
+                        local_random_state=args.local_search_random_state + stage_idx,
+                        local_sampling_strategy=args.local_search_sampling,
+                        prune_seed_front=False,
+                        prune_front=False,
+                    )
+                    eligible_fictive["milestone_target"] = current_milestone
+                    eligible_fictive["milestone_gap"] = (
+                        eligible_fictive["best_rank"] - current_milestone
+                    ).abs()
+                eligible_fictive = add_effort_columns(
+                    eligible_fictive,
+                    target_row,
+                    io_cols,
+                    normalization_ranges=normalization_ranges,
+                )
                 frames.append(eligible_fictive)
 
         if not frames:
             raise ValueError(f"No {args.mode} candidates found for rank milestone stage {stage_idx}.")
 
-        stage = pd.concat(frames, ignore_index=True)
-        stage_candidates.append(limit_stage(stage, args.points_per_stage))
+        stage = (
+            pd.concat(frames, ignore_index=True)
+            .drop_duplicates(subset=["name"], keep="last")
+            .reset_index(drop=True)
+        )
+        stage_candidates.append(stage)
 
     write_stage_candidates(stage_candidates, str(run_dir / "stage_candidates.csv"))
 
     start_state = real_metrics[real_metrics["name"] == args.target].iloc[0].copy()
+    transition_log = []
     paths = enumerate_state_paths(
         start_row=start_state,
         stage_candidates=stage_candidates,
         inputs=inputs,
         outputs=outputs,
         max_paths=args.max_paths,
+        points_per_transition=args.points_per_stage,
+        normalization_ranges=normalization_ranges,
+        minimal_inputs=[col for col in inputs if col in columns_to_modify],
+        minimal_outputs=[col for col in outputs if col in columns_to_modify],
+        transition_log=transition_log,
     )
-    state_paths_to_frame(paths, io_cols).to_csv(run_dir / "paths.csv", index=False)
+    pd.DataFrame(transition_log).to_csv(
+        run_dir / "transition_candidates.csv",
+        index=False,
+    )
+    final_paths_frame = state_paths_to_frame(paths, io_cols)
+    final_paths_frame.to_csv(run_dir / "paths.csv", index=False)
+    write_path_metrics(
+        final_paths_frame,
+        run_dir / "path_metrics.csv",
+        method_name="best_rank_path",
+        io_columns=io_cols,
+        normalization_ranges=normalization_ranges,
+    )
 
 
 if __name__ == "__main__":

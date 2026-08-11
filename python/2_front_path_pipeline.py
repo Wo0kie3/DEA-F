@@ -6,6 +6,7 @@ from java_runner import (
     export_candidate_robust_metrics_with_java,
     generate_preference_relations_with_java,
 )
+from path_metrics import write_path_metrics
 from path_pipeline_common import (
     add_effort_columns,
     build_component_graph,
@@ -21,6 +22,7 @@ from path_pipeline_common import (
     generate_attainable_fictive_candidates,
     get_io_columns,
     limit_paths,
+    normalization_ranges_from_frame,
     parse_columns_arg,
     path_for_java,
     paths_to_frame,
@@ -58,16 +60,6 @@ def parse_args():
     return parser.parse_args()
 
 
-def limit_stage(frame: pd.DataFrame, limit: int | None) -> pd.DataFrame:
-    frame = frame.sort_values(
-        by=["milestone_gap", "effort_from_start", "name"],
-        ascending=[True, True, True],
-    ).reset_index(drop=True)
-    if limit is not None and limit >= 0:
-        frame = frame.head(limit).copy()
-    return frame
-
-
 def main():
     args = parse_args()
     run_dir = create_run_output_dir(args.output_dir, "front_path")
@@ -76,6 +68,14 @@ def main():
     dmu_order = df_input["name"].astype(str).tolist()
     if args.target not in dmu_order:
         raise ValueError(f"Target DMU '{args.target}' not found in input CSV.")
+    inputs, outputs = get_io_columns(df_input)
+    io_cols = inputs + outputs
+    target_row = df_input[df_input["name"].astype(str) == args.target].iloc[0].copy()
+    normalization_ranges = normalization_ranges_from_frame(
+        df_input,
+        io_cols,
+        fallback_row=target_row,
+    )
 
     relations_csv = run_dir / "preference_relations_all.csv"
     generate_preference_relations_with_java(
@@ -133,15 +133,19 @@ def main():
         start_dmu=args.target,
     )
     dmu_paths = limit_paths(dmu_paths, args.max_paths)
-    real_paths_frame = paths_to_frame(dmu_paths)
+    real_paths_frame = paths_to_frame(dmu_paths, state_data=df_input)
     real_paths_frame.to_csv(run_dir / "real_paths.csv", index=False)
     if args.mode == "real":
         real_paths_frame.to_csv(run_dir / "paths.csv", index=False)
+        write_path_metrics(
+            real_paths_frame,
+            run_dir / "path_metrics.csv",
+            method_name="front_path",
+            io_columns=io_cols,
+            normalization_ranges=normalization_ranges,
+        )
         return
 
-    inputs, outputs = get_io_columns(df_input)
-    io_cols = inputs + outputs
-    target_row = df_input[df_input["name"].astype(str) == args.target].iloc[0].copy()
     columns_to_modify = parse_columns_arg(args.columns, io_cols)
 
     candidates = generate_attainable_fictive_candidates(
@@ -168,12 +172,22 @@ def main():
         maven_executable=args.maven_executable,
     )
     fictive_metrics = pd.read_csv(candidate_metrics_csv)
-    fictive_metrics = add_effort_columns(fictive_metrics, target_row, io_cols)
+    fictive_metrics = add_effort_columns(
+        fictive_metrics,
+        target_row,
+        io_cols,
+        normalization_ranges=normalization_ranges,
+    )
     fictive_metrics.to_csv(run_dir / "fictive_front_metrics.csv", index=False)
 
     real_states = df_input[["name", *io_cols]].copy()
     real_states["state_type"] = "real"
-    real_states = add_effort_columns(real_states, target_row, io_cols)
+    real_states = add_effort_columns(
+        real_states,
+        target_row,
+        io_cols,
+        normalization_ranges=normalization_ranges,
+    )
     start_state = real_states[real_states["name"] == args.target].iloc[0].copy()
 
     components_by_front = {}
@@ -182,6 +196,7 @@ def main():
 
     all_stage_candidates = []
     all_state_paths = []
+    transition_log = []
     for component_path in component_paths:
         stage_candidates = []
         for stage_idx, component_id in enumerate(component_path[1:], start=1):
@@ -211,7 +226,6 @@ def main():
                 break
 
             stage = pd.concat(frames, ignore_index=True)
-            stage = limit_stage(stage, args.points_per_stage)
             stage.insert(0, "stage", stage_idx)
             all_stage_candidates.append(stage)
             stage_candidates.append(stage.drop(columns=["stage"]))
@@ -230,6 +244,11 @@ def main():
                 inputs=inputs,
                 outputs=outputs,
                 max_paths=remaining,
+                points_per_transition=args.points_per_stage,
+                normalization_ranges=normalization_ranges,
+                minimal_inputs=[col for col in inputs if col in columns_to_modify],
+                minimal_outputs=[col for col in outputs if col in columns_to_modify],
+                transition_log=transition_log,
             )
         )
 
@@ -240,8 +259,20 @@ def main():
         )
     else:
         write_stage_candidates([], str(run_dir / "stage_candidates.csv"))
+    pd.DataFrame(transition_log).to_csv(
+        run_dir / "transition_candidates.csv",
+        index=False,
+    )
 
-    state_paths_to_frame(all_state_paths, io_cols).to_csv(run_dir / "paths.csv", index=False)
+    final_paths_frame = state_paths_to_frame(all_state_paths, io_cols)
+    final_paths_frame.to_csv(run_dir / "paths.csv", index=False)
+    write_path_metrics(
+        final_paths_frame,
+        run_dir / "path_metrics.csv",
+        method_name="front_path",
+        io_columns=io_cols,
+        normalization_ranges=normalization_ranges,
+    )
 
 
 if __name__ == "__main__":

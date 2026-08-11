@@ -1,5 +1,8 @@
 # DEA-F: Robust Improvement Paths
 
+> Skrócone podsumowanie projektu, opis bieżących zmian i kompletna instrukcja
+> uruchomienia na innym komputerze: [`PROJECT_SUMMARY.md`](PROJECT_SUMMARY.md).
+
 Repo zawiera pipeline'y Python + Java do generowania robust improvement paths w DEA na podstawie:
 
 - `Robust_Improvement_Paths_in_Data_Envelopment_Analysis.pdf`
@@ -86,7 +89,7 @@ Najważniejsze parametry dla trybu `fictive` i `mixed`:
 - `--step-abs 0.1` - opcjonalny krok absolutny zamiast procentowego.
 - `--min-points-per-dim 3` - minimalna liczba punktów na wymiar.
 - `--max-candidates 2000` - twardy limit kandydatów, żeby nie przeciążyć komputera.
-- `--points-per-stage 50` - opcjonalny limit kandydatów zostawianych na etap po filtracji milestone'u.
+- `--points-per-stage 50` - opcjonalny limit kandydatów zostawianych osobno dla każdego poprzednika po filtracji osiągalności i frontu minimalnych zmian.
 - `--max-paths 100` - limit zapisanych ścieżek.
 
 Przy wielu kolumnach liczba kandydatów rośnie jak iloczyn liczby punktów po wymiarach, więc najpierw testuj na 1-2 kolumnach.
@@ -120,7 +123,7 @@ Największy wpływ na koszt obliczeń mają:
 - `--points-per-stage`
 - `--stages`
 
-Mniejszy `--step-pct` daje dokładniejszą siatkę, ale szybko zwiększa liczbę kandydatów. Większe `--points-per-stage` zostawia więcej alternatyw na każdym etapie, więc może zwiększyć liczbę ścieżek kombinatorycznie.
+Mniejszy `--step-pct` daje dokładniejszą siatkę, ale szybko zwiększa liczbę kandydatów. Większe `--points-per-stage` zostawia więcej alternatywnych przejść z każdego poprzednika, więc może zwiększyć liczbę ścieżek kombinatorycznie.
 
 ## 1. Hasse Path
 
@@ -317,7 +320,9 @@ Najważniejsze pliki wspólne:
 - `fictive_candidates.csv` - wszystkie wygenerowane sztuczne stany przed oceną robustDEA.
 - `fictive_candidate_metrics.csv` - pełna ocena tych stanów przez Java/robustDEA.
 - `stage_candidates.csv` - kandydaci, którzy przeszli filtr danego milestone'u.
+- `transition_candidates.csv` - niezdominowani kandydaci osiągalni z konkretnych poprzedników, wraz z `effort_from_previous`.
 - `paths.csv` - finalne ścieżki po uwzględnieniu monotoniczności input/output i limitu `--max-paths`.
+- `path_metrics.csv` - syntetyczny pomiar każdej ścieżki z `paths.csv`.
 
 Najważniejsze kolumny:
 
@@ -329,7 +334,8 @@ Najważniejsze kolumny:
 - `score_width` - rozpiętość efektywności; mniejsza oznacza większą stabilność.
 - `rank_width` - rozpiętość rankingu; mniejsza oznacza większą stabilność.
 - `milestone_gap` - odchylenie od idealnego milestone'u; mniejsze jest lepsze.
-- `effort_from_start` - uproszczona skala zmiany względem DMU startowego; mniejsze oznacza mniej agresywną modyfikację.
+- `effort_from_start` - pomocnicza skala zmiany względem DMU startowego; nie służy do wyboru następnego kroku.
+- `effort_from_previous` - znormalizowany wysiłek przejścia od faktycznego poprzedniego punktu ścieżki.
 - `candidate_necessary_over_count` - liczba DMU, nad którymi kandydat ma necessary przewagę.
 - `candidate_possible_over_count` - liczba DMU, nad którymi kandydat ma possible przewagę.
 
@@ -339,6 +345,75 @@ Praktyczna interpretacja:
 - Jeśli `stage_candidates.csv` ma dane, ale `paths.csv` jest pusty, kandydaci istnieją, ale nie da się ich połączyć w monotoniczną ścieżkę zmian input/output.
 - Jeśli `paths.csv` ma dużo wierszy, metoda znalazła wiele alternatywnych ścieżek; wtedy warto obniżyć `--points-per-stage` albo później użyć evaluatora ścieżek.
 - Jeśli fictive states dają lepsze milestone'y niż real states, to oznacza, że w danych brakuje dobrych obserwowalnych benchmarków, ale przestrzeń osiągalna zawiera sensowne stany pośrednie.
+
+### Stepwise candidate selection
+
+For every partial path, stage `h` is evaluated relative to its actual predecessor
+`z_(h-1)`. The pipeline first filters candidates attainable from that predecessor,
+then builds the Pareto front of incremental input reductions and output increases.
+`--points-per-stage` is retained for CLI compatibility, but it now limits candidates
+per predecessor transition. `transition_candidates.csv` records these branch-specific
+fronts, including `transition_reference_name` and `effort_from_previous`.
+
+Path metrics use equal factor weights and fixed normalization ranges observed in the
+reference input data. `effort_from_start` remains a descriptive start-to-state value;
+it is not used to choose the next point.
+
+## Path Metrics
+
+Moduł `python/path_metrics.py` mierzy ścieżki wygenerowane przez wszystkie pięć metod.
+Pipeline'y zapisują raport automatycznie jako `path_metrics.csv` w katalogu danego runu.
+
+Najważniejsze grupy metryk:
+
+- struktura ścieżki: `path_length`, `stage_count`, `unique_state_count`, `repeated_state_count`;
+- typy stanów: `real_state_count`, `fictive_state_count`, `mixed_state_path`;
+- metryki zgodne z paperem: `tc`, `msc`, `cdir`, `dr`, `md`, `bp`, `wbp`, `sbp`, `swbp`, `mcp`, `pyv`, `pym`, `apw`, `fw`, `ww`, `pc`, `opp`, `rr`;
+- koszt ruchu: `final_effort_from_start`, `max_effort_from_start`, `total_effort_movement`;
+- dopasowanie do milestone'ow: `final_milestone_gap`, `total_milestone_gap`, `mean_milestone_gap`, `max_milestone_gap`;
+- zmiana input/output: `total_input_reduction`, `total_output_increase`, `total_io_abs_change`, `total_step_io_abs_change`, `io_directness`;
+- kontrola monotoniczności: `attainable_transition_violations`;
+- robust DEA: start, final, delta oraz poprawa/redukcja dla `best_efficiency`, `best_rank`, `score_width`, `rank_width`.
+
+Uwagi do nowych metryk:
+
+- `tc`, `msc`, `cdir`, `dr`, `bp`, `wbp`, `sbp`, `swbp` i `mcp` są liczone z normalizowanych zmian między kolejnymi punktami. Pipeline używa stałych zakresów z wejściowych danych referencyjnych oraz równych wag czynników i etapów.
+- `pyv` i `pym` są liczone dla pierwszego dostępnego wskaźnika postępu, a warianty `pyv_best_efficiency`, `pyv_best_rank` itd. pokazują wyniki dla konkretnych wskaźników.
+- `apw`, `fw` i `ww` wybierają pierwszą dostępną szerokość robustności; szczegółowe warianty są w `apw_score`, `fw_score`, `ww_score`, `apw_rank`, `fw_rank`, `ww_rank`.
+- `pc` wymaga kolumn ze zbiorami referencyjnymi. Najpierw używa klasycznych peer-set kolumn, np. `peer_refs`, `peer_set` albo `reference_set`, jeśli są obecne. Pipeline przenosi też dostępne listy robust-reference z Java, które mogą służyć jako pomocniczy wariant ciągłości.
+
+Modułu można użyć też na istniejącym pliku:
+
+```powershell
+python .\python\path_metrics.py --paths .\output\...\paths.csv --method-name best_efficiency_path
+```
+
+### Template Do Testów Metryk
+
+W katalogu `templates/` są pliki pomocnicze do szybkiego testowania evaluatora:
+
+- `path_metrics_input_template.csv` - przykładowy plik w formacie `paths.csv` z dwiema ścieżkami testowymi.
+- `path_metric_descriptions.csv` - słownik metryk: grupa, kierunek optymalizacji, prosty opis i odniesienie do wzoru z paperu.
+- `path_metrics_output_example.csv` - przykładowy wynik działania `python/path_metrics.py`.
+- `path_metrics_report_example.md` - przykładowy raport Markdown z tabelami pogrupowanymi według typu metryki.
+
+Przeliczenie metryk dla szablonu:
+
+```powershell
+python .\python\path_metrics.py `
+  --paths .\templates\path_metrics_input_template.csv `
+  --output .\templates\path_metrics_output_example.csv `
+  --method-name template
+```
+
+Wygenerowanie raportu Markdown z dowolnego `path_metrics.csv`:
+
+```powershell
+python .\python\render_path_metrics_markdown.py `
+  --metrics .\templates\path_metrics_output_example.csv `
+  --descriptions .\templates\path_metric_descriptions.csv `
+  --output .\templates\path_metrics_report_example.md
+```
 
 ## Uwaga O Koszcie
 

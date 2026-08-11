@@ -8,6 +8,11 @@ target/
 out/
 data/
 output/
+tmp/
+
+# JVM crash diagnostics
+hs_err_pid*.log
+replay_pid*.log
 
 # Local reference PDFs
 RobustEfficiencyAnalysis.pdf
