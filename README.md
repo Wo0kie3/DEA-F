@@ -134,6 +134,34 @@ Największy wpływ na koszt obliczeń mają:
 
 Mniejszy `--step-pct` daje dokładniejszą siatkę, ale szybko zwiększa liczbę kandydatów. Większe `--points-per-stage` zostawia więcej alternatywnych przejść z każdego poprzednika, więc może zwiększyć liczbę ścieżek kombinatorycznie.
 
+## Snapshot Wejścia DEA
+
+Przed prezentacją ścieżek wygeneruj wspólny snapshot danych referencyjnych i bazowych wyników robust DEA:
+
+```powershell
+python .\python\generate_dea_input_snapshot.py `
+  --input .\input\robot_technology_table1.csv `
+  --output-dir .\output\<eksperyment>\dea_input_snapshot `
+  --java-entry .\java
+```
+
+Java wylicza relacje necessary/possible, skrajne efektywności i skrajne rangi. Fronty efektywności powstają przez kolejne przeliczenia Javy po usunięciu jednostek efektywnych. Python przekształca relacje w macierze, klasy równoważności, warstwy rankingu necessary i krawędzie diagramu Hassego. Najważniejsze pliki:
+
+- `decision_data.csv` — macierz decyzyjna `X/Y` użyta przez DEA;
+- `reference_dmu_results.csv` — inputy, outputy, przedziały score i rangi, szerokości, front efektywności oraz poziom rankingu NEC każdej DMU;
+- `efficiency_fronts.csv` — wynik peelingu frontów efektywności: po każdym przeliczeniu usuwane są DMU z `best_efficiency = 1`;
+- `necessary_matrix.csv` i `possible_matrix.csv` — pełne macierze relacji; wiersz/source jest preferowany nad kolumną/target;
+- `necessary_components.csv` — klasy równoważności i ich poziomy rankingu NEC;
+- `necessary_ranking.csv` — przypisanie każdej DMU do klasy i poziomu rankingu NEC;
+- `necessary_cover_edges.csv` — krawędzie pokrycia diagramu Hassego;
+- `snapshot_metadata.csv` — źródło, kolumny DEA, klasy Javy i orientacja macierzy.
+
+`efficiency_front = 1` oznacza jednostki efektywne w pierwszym przeliczeniu. `necessary_rank = 1` oznacza maksymalne klasy częściowego porządku necessary. Są to dwa różne obiekty; żaden z nich nie jest przejściowym frontem Pareto minimalnych zmian liczonym dla konkretnego poprzednika ścieżki.
+
+Referencyjny przykład w `examples/five_unit_2d/` korzysta z 27 robotów z Table 1 artykułu Baker i Talluri (1997). Mapowanie kolumn jest następujące: `i1 = Cost`, `i2 = Repeatability`, `o1 = Load capacity`, `o2 = Velocity`. Kolumna `reported_efficiency` służy tylko do kontroli danych z publikacji i nie jest wymiarem modelu DEA.
+
+Generator raportu 2D może pokazać wszystkie ocenione punkty i ich robust efficiency dla wybranego etapu. Opcjonalne `--normalize-display` przedstawia oba inputy na czytelnej skali `0–100%` badanego zakresu, pozostawiając oryginalne wartości w hoverze i tabeli; nie zmienia obliczeń DEA ani frontów. Szczegóły i kompletne polecenia znajdują się w [`docs/EXPERIMENT_OUTPUT_AND_VISUALIZATION.md`](docs/EXPERIMENT_OUTPUT_AND_VISUALIZATION.md).
+
 ## 1. Hasse Path
 
 Real:
@@ -168,7 +196,9 @@ Interpretacja eksperymentu:
 - Dobra ścieżka Hassego oznacza przejście od targetu do klasy maksymalnej przez kolejne robustly lepsze milestone'y.
 - Pusty `paths.csv` oznacza, że przy danej siatce i ograniczeniach nie znaleziono stanu spełniającego wymagania klas po drodze.
 
-## 2. Front Path
+## 2. Necessary-Layer Path (`2_front_path_pipeline.py`)
+
+Nazwa pliku jest historyczna. Aktualny pipeline warstwuje klasy relacji necessary i **nie** implementuje iteracyjnych frontów efektywności DEA.
 
 Real:
 
@@ -200,12 +230,12 @@ Najważniejsze wyniki:
 
 Interpretacja eksperymentu:
 
-- `fronts.csv` pokazuje przypisanie klas necessary do frontów.
-- `front = 1` oznacza najlepszą warstwę robust frontu.
-- `component_paths.csv` pokazuje przejście front po froncie od frontu targetu do `F1`.
-- `--require-edge-monotonicity` zawęża ścieżki do takich, które nie tylko idą do lepszego frontu, ale też respektują krawędzie necessary.
-- W trybie `fictive` milestone'em jest front, a stan sztuczny musi spełnić wymaganie robust względem klas z danego frontu.
-- Pusty wynik zwykle oznacza, że siatka fictive nie zawierała punktu, który da się monotonicznie połączyć z kolejnymi frontami.
+- `fronts.csv` przechowuje historycznie nazwane warstwy rankingu necessary.
+- `front = 1` oznacza maksymalne klasy relacji necessary, a nie pierwszy front efektywności.
+- `component_paths.csv` pokazuje przejście warstwa po warstwie od poziomu targetu do najlepszej warstwy.
+- `--require-edge-monotonicity` zawęża ścieżki do takich, które respektują krawędzie necessary.
+- W trybie `fictive` milestone'em jest warstwa rankingu necessary, a stan sztuczny musi spełnić wymaganie robust względem klas z tej warstwy.
+- Pusty wynik zwykle oznacza, że siatka fictive nie zawierała punktu, który da się monotonicznie połączyć z kolejnymi warstwami.
 
 ## 3. Best Rank Path
 

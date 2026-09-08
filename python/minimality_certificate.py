@@ -1,4 +1,5 @@
 import argparse
+import re
 from pathlib import Path
 
 import pandas as pd
@@ -108,6 +109,16 @@ def relative_reduction_sum(row, previous, columns):
     return total * 100.0
 
 
+def discover_stage_dea_columns(path_row, stage, prefix):
+    pattern = re.compile(rf"stage_{stage:02d}_({re.escape(prefix)}(\d+))$")
+    matches = []
+    for column_name in path_row.index:
+        match = pattern.fullmatch(str(column_name))
+        if match:
+            matches.append((int(match.group(2)), match.group(1)))
+    return [name for _, name in sorted(matches)]
+
+
 def main():
     args = parse_args()
     experiment_dir = Path(args.experiment_dir)
@@ -129,6 +140,7 @@ def main():
     if path_row.empty:
         raise ValueError(f"Path {selected_metric['path_id']} not found in paths.csv.")
     path_row = path_row.iloc[0]
+    output_columns = discover_stage_dea_columns(path_row, 0, "o")
 
     milestones = pd.read_csv(run_dir / "efficiency_milestones.csv").set_index("stage")
     start = {
@@ -151,6 +163,10 @@ def main():
             **{
                 column: float(path_row[f"stage_{stage:02d}_{column}"])
                 for column in columns
+            },
+            **{
+                column: float(path_row[f"stage_{stage:02d}_{column}"])
+                for column in output_columns
             },
         }
         threshold = float(milestones.loc[stage, "milestone_best_efficiency"])
@@ -185,6 +201,7 @@ def main():
                 "point_name": selected["name"],
                 columns[0]: selected[columns[0]],
                 columns[1]: selected[columns[1]],
+                **{column: selected[column] for column in output_columns},
                 f"delta_{columns[0]}": previous[columns[0]] - selected[columns[0]],
                 f"delta_{columns[1]}": previous[columns[1]] - selected[columns[1]],
                 "relative_reduction_sum_pct": selected_reduction_sum,
@@ -252,6 +269,19 @@ def main():
         if selected_by_min_tc
         else "Sciezka zostala wskazana przez parametr --path-id."
     )
+    fixed_output_text = ", ".join(
+        f"{column} = {fmt(path_row[f'stage_00_{column}'])}"
+        for column in output_columns
+    )
+    fixed_output_violations = sum(
+        abs(
+            float(path_row[f"stage_{stage:02d}_{column}"])
+            - float(path_row[f"stage_00_{column}"])
+        )
+        > args.tolerance
+        for stage in range(1, int(path_row["path_length"]) + 1)
+        for column in output_columns
+    )
     parameter_lines = []
     parameters_path = experiment_dir / "experiment_params.csv"
     if parameters_path.exists():
@@ -303,7 +333,10 @@ def main():
         f"- Eksperyment: `{experiment_dir}`",
         f"- Wybrana sciezka: `{selected_metric['path_id']}`",
         f"- Zmieniane wymiary: `{', '.join(columns)}`",
-        f"- Staly output: `o1 = {fmt(path_row['stage_00_o1'])}`",
+        f"- {'Staly output' if len(output_columns) == 1 else 'Stale outputy'}: "
+        f"`{fixed_output_text}`",
+        f"- Outputy stale na wszystkich etapach: "
+        f"`{'TAK' if fixed_output_violations == 0 else 'NIE'}`",
         f"- Punkt startowy: `{columns[0]}={fmt(start[columns[0]])}, "
         f"{columns[1]}={fmt(start[columns[1]])}`",
         "",

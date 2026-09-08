@@ -2,10 +2,30 @@ import unittest
 
 import pandas as pd
 
-from minimality_certificate import dominating_mask, find_selected_path, pareto_front_mask
+from minimality_certificate import (
+    discover_stage_dea_columns,
+    dominating_mask,
+    find_selected_path,
+    pareto_front_mask,
+)
 
 
 class MinimalityCertificateTests(unittest.TestCase):
+    def test_discovers_all_outputs_in_numeric_order(self):
+        path_row = pd.Series(
+            {
+                "stage_00_o10": 10.0,
+                "stage_00_i1": 1.0,
+                "stage_00_o2": 2.0,
+                "stage_00_o1": 1.0,
+            }
+        )
+
+        self.assertEqual(
+            discover_stage_dea_columns(path_row, stage=0, prefix="o"),
+            ["o1", "o2", "o10"],
+        )
+
     def test_tc_values_within_tolerance_use_msc_tie_break(self):
         metrics = pd.DataFrame(
             [

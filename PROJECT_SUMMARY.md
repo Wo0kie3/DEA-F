@@ -10,14 +10,14 @@ DEA-F generuje i ocenia odporne ścieżki poprawy (robust improvement paths) w D
 - Java/Maven — dokładne obliczenia robust DEA z biblioteki `dea-robustness`;
 - CSV — dane wejściowe i wyniki kolejnych etapów eksperymentu.
 
-Projekt implementuje pięć metod: ścieżkę po diagramie Hassego, ścieżkę przez fronty, ścieżkę najlepszej rangi, ścieżkę najlepszej efektywności oraz ścieżkę zmniejszającą szerokość robustności.
+Projekt implementuje pięć pipeline'ów: ścieżkę po diagramie Hassego, historyczną ścieżkę przez warstwy rankingu necessary, ścieżkę najlepszej rangi, ścieżkę najlepszej efektywności oraz ścieżkę zmniejszającą szerokość robustności. Iteracyjne fronty efektywności są obecnie wyznaczane w snapshotcie wejściowym i prezentowane w raporcie; nie należy ich utożsamiać z pipeline'em 2.
 
 ## Najważniejsze elementy repozytorium
 
 | Ścieżka | Rola |
 |---|---|
 | `python/1_hasse_path_pipeline.py` | Metoda 1: przejścia po relacji necessary i diagramie Hassego. |
-| `python/2_front_path_pipeline.py` | Metoda 2: przejścia przez kolejne fronty robust DEA. |
+| `python/2_front_path_pipeline.py` | Metoda 2: historycznie nazwana ścieżka po warstwach rankingu necessary; nie jest peelingiem frontów efektywności. |
 | `python/3_best_rank_path_pipeline.py` | Metoda 3: poprawa najlepszej osiągalnej rangi. |
 | `python/4_best_efficiency_path_pipeline.py` | Metoda 4: poprawa najlepszej efektywności. |
 | `python/5_robustness_width_path_pipeline.py` | Metoda 5: redukcja szerokości score lub rank. |
@@ -25,6 +25,7 @@ Projekt implementuje pięć metod: ścieżkę po diagramie Hassego, ścieżkę p
 | `python/candidate_refinement.py` | Lokalna i globalna rafinacja kandydatów fictive. |
 | `python/path_metrics.py` | Obliczanie metryk jakości każdej ścieżki. |
 | `python/collect_path_metrics.py` | Łączenie metryk wszystkich metod w podsumowanie eksperymentu. |
+| `python/generate_dea_input_snapshot.py` | Bazowy snapshot `X/Y`, scores, rang, iteracyjnych frontów efektywności, macierzy NEC/POS, rankingu necessary i diagramu Hassego. |
 | `python/render_path_metrics_*.py` | Raporty Markdown i PDF. |
 | `python/visualize_*.py` | Wizualizacje 2D/3D i certyfikaty minimalności. |
 | `java/` | Projekt Maven i klasy eksportujące metryki robust DEA do CSV. |
@@ -32,6 +33,7 @@ Projekt implementuje pięć metod: ścieżkę po diagramie Hassego, ścieżkę p
 | `templates/` | Szablony danych, opisów metryk i przykładowego raportu. |
 | `docs/EXPERIMENT_OUTPUT_AND_VISUALIZATION.md` | Kanoniczna instrukcja porównywalnego outputu 2D, certyfikatu, wykresu i tabeli. |
 | `examples/five_unit_2d/` | Lekka, referencyjna wersja interaktywnego porównania pięciu DMU. |
+| `input/robot_technology_table1.csv` | Dane 27 robotów z Table 1: koszt i powtarzalność jako inputy, udźwig i prędkość jako outputy. |
 | `run_edu_3d_experiment.ps1` | Uruchomienie wszystkich pięciu metod dla eksperymentu EDU 3D. |
 | `output/` | Lokalne wyniki eksperymentów; katalog jest ignorowany przez Git. |
 
@@ -50,6 +52,7 @@ Do projektu dodano także:
 - wspólne zestawienia `all_path_metrics.csv` i `method_summary.csv`;
 - rafinację lokalną oraz próbkowanie globalne dla metod numerycznych;
 - raporty Markdown/PDF, wizualizacje 2D/3D i certyfikaty minimalności;
+- wspólny snapshot wejścia DEA prezentowany przed ścieżkami: dane `X/Y`, scores, rangi, iteracyjne fronty efektywności, NEC/POS, ranking necessary i krawędzie Hassego;
 - testy selekcji przejść, rafinacji i certyfikatu minimalności.
 
 ## Uruchomienie na nowym komputerze
@@ -138,6 +141,8 @@ Tryby pipeline'ów:
 - `mixed` — połączenie stanów realnych i fictive.
 
 Tryby `fictive` i `mixed` mogą być kosztowne. Liczba punktów rośnie szybko wraz z liczbą kolumn i zagęszczeniem siatki. Pierwsze próby warto wykonywać dla 1–2 zmiennych, większego `--step-pct` oraz małego `--max-candidates`.
+
+Końcowy raport powinien zaczynać się od snapshotu bazowego liczonego na oryginalnym zbiorze referencyjnym. Java dostarcza skrajne efektywności, skrajne rangi oraz pary relacji necessary/possible; jest też ponownie uruchamiana po usunięciu kolejnych zbiorów DMU efektywnych, aby wyznaczyć fronty efektywności. Python zapisuje czytelne macierze, klasy równoważności, ranking necessary i krawędzie Hassego. Dopiero po tej sekcji prezentowane są punkty fictive, przejściowe fronty Pareto i wybrana ścieżka.
 
 ## Weryfikacja po sklonowaniu
 

@@ -20,6 +20,44 @@ STAGE_COLORS = {
 }
 
 
+def load_evaluated_pool(run_dir, stage):
+    sources = [
+        (run_dir / "fictive_candidate_metrics.csv", "siatka bazowa"),
+        (run_dir / "global_search_metrics.csv", "próbkowanie globalne"),
+    ]
+    sources.extend(
+        (path, "iteracja refinementu")
+        for path in sorted(run_dir.glob(f"stage_{stage:02d}_eff_refine_iter_*_metrics.csv"))
+    )
+    sources.extend(
+        [
+            (
+                run_dir / f"stage_{stage:02d}_eff_refined_final_metrics.csv",
+                "granica po refinemencie",
+            ),
+            (
+                run_dir / f"stage_{stage:02d}_eff_local_search_metrics.csv",
+                "przeszukiwanie lokalne",
+            ),
+        ]
+    )
+
+    frames = []
+    for path, source in sources:
+        if not path.exists():
+            continue
+        frame = pd.read_csv(path)
+        frame["sampling_source"] = source
+        frames.append(frame)
+    if not frames:
+        raise FileNotFoundError(f"No evaluated-point files found for stage {stage}.")
+    return (
+        pd.concat(frames, ignore_index=True, sort=False)
+        .drop_duplicates(subset=["name"], keep="last")
+        .reset_index(drop=True)
+    )
+
+
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--experiment-dir", required=True)
@@ -65,27 +103,54 @@ def load_visualization_data(experiment_dir, columns, path_id, tolerance):
     for stage in range(1, int(path_row["path_length"]) + 1):
         threshold = float(milestones.loc[stage, "milestone_best_efficiency"])
         previous = path_points[stage - 1]
-        pool = load_selection_pool(run_dir, stage)
-        pool = pool.dropna(subset=columns).reset_index(drop=True)
+        selection_pool = load_selection_pool(run_dir, stage)
+        selection_pool = selection_pool.dropna(subset=columns).reset_index(drop=True)
+        evaluated_pool = load_evaluated_pool(run_dir, stage)
+        evaluated_pool = evaluated_pool.dropna(subset=columns).reset_index(drop=True)
+        missing_selection = selection_pool[
+            ~selection_pool["name"].astype(str).isin(evaluated_pool["name"].astype(str))
+        ].copy()
+        if not missing_selection.empty:
+            missing_selection["sampling_source"] = "pula selekcyjna"
+            evaluated_pool = pd.concat(
+                [evaluated_pool, missing_selection],
+                ignore_index=True,
+                sort=False,
+            )
+        selection_names = set(selection_pool["name"].astype(str))
         target_mask = (
-            pd.to_numeric(pool["best_efficiency"], errors="coerce") + tolerance >= threshold
+            pd.to_numeric(evaluated_pool["best_efficiency"], errors="coerce") + tolerance
+            >= threshold
         )
-        attainable_mask = pd.Series(True, index=pool.index)
+        attainable_mask = pd.Series(True, index=evaluated_pool.index)
         for column, previous_value in zip(columns, [previous["x"], previous["y"]]):
             attainable_mask &= (
-                pd.to_numeric(pool[column], errors="coerce")
+                pd.to_numeric(evaluated_pool[column], errors="coerce")
                 <= previous_value + tolerance
             )
-        eligible_mask = target_mask & attainable_mask
-        eligible_pool = pool[eligible_mask].copy().reset_index(drop=True)
+        selection_mask = evaluated_pool["name"].astype(str).isin(selection_names)
+        eligible_mask = selection_mask & target_mask & attainable_mask
+        eligible_pool = evaluated_pool[eligible_mask].copy().reset_index(drop=True)
         eligible_front_mask = pareto_front_mask(eligible_pool, columns, tolerance)
         front_names = set(eligible_pool.loc[eligible_front_mask, "name"].astype(str))
         selected_name = path_row[f"stage_{stage:02d}_name"]
 
-        for row_idx, row in pool.iterrows():
+        for row_idx, row in evaluated_pool.iterrows():
             target_eligible = bool(target_mask.iloc[row_idx])
             attainable = bool(attainable_mask.iloc[row_idx])
-            eligible = target_eligible and attainable
+            in_selection_pool = bool(selection_mask.iloc[row_idx])
+            eligible = in_selection_pool and target_eligible and attainable
+            is_front = eligible and str(row["name"]) in front_names
+            if not target_eligible:
+                status = "below_threshold"
+            elif not in_selection_pool:
+                status = "probe"
+            elif not attainable:
+                status = "unattainable"
+            elif is_front:
+                status = "front"
+            else:
+                status = "dominated"
             points.append(
                 {
                     "stage": stage,
@@ -93,10 +158,17 @@ def load_visualization_data(experiment_dir, columns, path_id, tolerance):
                     "x": round(float(row[columns[0]]), 6),
                     "y": round(float(row[columns[1]]), 6),
                     "best_efficiency": round(float(row["best_efficiency"]), 6),
+                    "worst_efficiency": round(float(row["worst_efficiency"]), 6),
+                    "score_width": round(float(row["score_width"]), 6),
+                    "best_rank": int(float(row["best_rank"])),
+                    "worst_rank": int(float(row["worst_rank"])),
+                    "sampling_source": str(row.get("sampling_source", "pula selekcyjna")),
+                    "in_selection_pool": in_selection_pool,
                     "target_eligible": target_eligible,
                     "attainable": attainable,
                     "eligible": eligible,
-                    "front": eligible and str(row["name"]) in front_names,
+                    "front": is_front,
+                    "status": status,
                     "selected": str(row["name"]) == str(selected_name),
                 }
             )
@@ -105,7 +177,8 @@ def load_visualization_data(experiment_dir, columns, path_id, tolerance):
             {
                 "stage": stage,
                 "threshold": threshold,
-                "tested": len(pool),
+                "evaluated": len(evaluated_pool),
+                "tested": len(selection_pool),
                 "target_eligible": int(target_mask.sum()),
                 "eligible": int(eligible_mask.sum()),
                 "front": int(eligible_front_mask.sum()),

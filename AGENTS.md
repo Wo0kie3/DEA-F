@@ -11,7 +11,7 @@ Python odpowiada za generowanie kandydatów, składanie ścieżek, metryki, rapo
 ## Aktywna architektura
 
 - `python/1_hasse_path_pipeline.py` — metoda necessary/Hasse.
-- `python/2_front_path_pipeline.py` — metoda kolejnych frontów.
+- `python/2_front_path_pipeline.py` — historycznie nazwana metoda kolejnych warstw rankingu necessary; obecnie nie implementuje peelingu frontów efektywności.
 - `python/3_best_rank_path_pipeline.py` — kamienie milowe najlepszej rangi.
 - `python/4_best_efficiency_path_pipeline.py` — kamienie milowe najlepszej efektywności.
 - `python/5_robustness_width_path_pipeline.py` — redukcja szerokości score albo rank.
@@ -20,9 +20,11 @@ Python odpowiada za generowanie kandydatów, składanie ścieżek, metryki, rapo
 - `python/path_metrics.py` — metryki całych ścieżek.
 - `python/minimality_certificate.py` — certyfikat minimalności względem przebadanej puli.
 - `python/collect_path_metrics.py` — agregacja wyników metod.
+- `python/generate_dea_input_snapshot.py` — wspólny snapshot wejścia `X/Y`, bazowych metryk robust DEA, iteracyjnych frontów efektywności, macierzy NEC/POS, rankingu necessary i diagramu Hassego.
 - `python/render_*`, `python/generate_*`, `python/visualize_*` — raportowanie i wizualizacje.
 - `docs/EXPERIMENT_OUTPUT_AND_VISUALIZATION.md` — kanoniczny workflow porównywalnych eksperymentów 2D i standard końcowego wykresu.
 - `examples/five_unit_2d/` — pojedyncza lekka wersja referencyjna wykresu; właściwe, samowystarczalne artefakty pozostają w `output/`.
+- `input/robot_technology_table1.csv` — 27 robotów z Table 1 Baker i Talluri (1997): dwa inputy (`Cost`, `Repeatability`) i dwa outputy (`Load capacity`, `Velocity`).
 - `python/java_runner.py` — jedyne aktywne miejsce wywołań klas Java przez Maven.
 - `java/src/main/java/org/example/` — adaptery CSV do biblioteki robust DEA.
 - `input/` — dane wejściowe; `templates/` — szablony metryk i raportów.
@@ -87,7 +89,7 @@ Minimalność etapu oznacza brak dominującego punktu w faktycznie ocenionej pul
 ## Pięć metod
 
 1. **Hasse path** — korzysta z klas równoważności relacji necessary i krawędzi pokrycia diagramu Hassego. W trybie fictive/mixed kolejne stany muszą spełniać wymagania odpowiednich klas necessary.
-2. **Front path** — przechodzi od frontu targetu do `F1`; opcjonalne `--require-edge-monotonicity` dodatkowo respektuje krawędzie necessary.
+2. **Necessary-layer path** (`2_front_path_pipeline.py`, nazwa historyczna) — przechodzi po warstwach DAG relacji necessary; opcjonalne `--require-edge-monotonicity` respektuje krawędzie necessary. Nie utożsamiaj tych warstw z frontami efektywności DEA.
 3. **Best rank path** — na etapie `h` kandydat spełnia `best_rank <= r_h`.
 4. **Best efficiency path** — na etapie `h` kandydat spełnia `best_efficiency >= e_h`.
 5. **Robustness width path** — kandydat spełnia `width <= w_h`; dodatkowo nie może pogorszyć głównego wskaźnika postępu: `best_efficiency` dla score width albo `best_rank` dla rank width.
@@ -104,11 +106,24 @@ Milestone’y metod 3–5 są interpolowane liniowo od wartości startowej do ce
 - Dla porównywalnych eksperymentów zachowuj parametry i ziarna losowe w `experiment_params.csv`.
 - Ciężkie eksperymenty uruchamiaj sekwencyjnie. Równoległe instancje Maven/JVM powodowały awarie z braku pamięci.
 - Przy przygotowywaniu wspólnego outputu 2D stosuj `docs/EXPERIMENT_OUTPUT_AND_VISUALIZATION.md`. Nie łącz runów o różnych parametrach i nie zastępuj frontów liczonych względem faktycznego poprzednika frontem globalnym względem startu.
+- Na wykresie 2D można pokazywać wszystkie faktycznie ocenione punkty, w tym pośrednie próby refinementu. Odróżniaj je od puli selekcyjnej: próba diagnostyczna nie staje się przez samą wizualizację kandydatem ścieżki, a front przejścia licz wyłącznie na osiągalnych punktach puli selekcyjnej spełniających milestone.
+- Opcja wizualizacji `--normalize-display` skaluje każdą oś od `0%` w punkcie startowym do `100%` przy najmniejszej ocenionej wartości inputu. Traktuj ją wyłącznie jako monotoniczną transformację prezentacyjną, zachowuj oryginalne wartości w hoverze i nie używaj współrzędnych ekranowych do ponownego liczenia kosztów ani frontów.
+- Przed wygenerowaniem raportu prezentacyjnego utwórz jeden `dea_input_snapshot` dla wspólnego zbioru referencyjnego. Raport ma pokazać go przed ścieżkami i jawnie rozróżniać iteracyjne fronty efektywności, ranking necessary oraz przejściowy front Pareto minimalnych zmian.
+- Front efektywności licz przez peeling: przelicz `best_efficiency`, usuń DMU z wartością `1` w tolerancji, ponów obliczenie na pozostałym zbiorze. Nie wyprowadzaj frontów efektywności z macierzy NEC.
+- Relacje, skrajne scores, skrajne rangi i score używane w kolejnych iteracjach peelingu są wynikami Javy. Macierze, klasy równoważności, warstwy rankingu necessary i krawędzie Hassego są strukturami wyprowadzanymi w Pythonie; nie opisuj ich wszystkich jako bezpośredniego outputu Javy.
 - Do Git dodawaj tylko lekką wersję przykładową z `--plotly-mode cdn`. Nie commituj samowystarczalnego HTML z osadzonym kodem Plotly ani kopii całych katalogów wynikowych.
 
 ## Pliki wynikowe
 
-Każdy run dostaje osobny katalog `run_<timestamp>` pod katalogiem metody. Najważniejsze pliki:
+Wspólny katalog eksperymentu powinien zawierać snapshot bazowego wejścia DEA:
+
+- `dea_input_snapshot/decision_data.csv` — dane `X/Y` użyte przez bazowe obliczenia;
+- `dea_input_snapshot/reference_dmu_results.csv` — scores, rangi, widths, front efektywności i poziom rankingu NEC dla oryginalnych DMU;
+- `dea_input_snapshot/efficiency_fronts.csv` — fronty efektywności z iteracyjnego usuwania jednostek efektywnych;
+- `dea_input_snapshot/necessary_matrix.csv` i `possible_matrix.csv` — macierze relacji z orientacją wiersz/source nad kolumną/target;
+- `dea_input_snapshot/necessary_components.csv`, `necessary_ranking.csv` i `necessary_cover_edges.csv` — struktura rankingu i diagramu Hassego relacji necessary;
+
+Każdy run dostaje osobny katalog `run_<timestamp>` pod katalogiem metody. Najważniejsze pliki runu:
 
 - `fictive_candidates.csv` — wygenerowane stany przed oceną;
 - `fictive_candidate_metrics.csv` — metryki robust DEA stanów;
