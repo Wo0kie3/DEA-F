@@ -400,9 +400,17 @@ then builds the Pareto front of incremental input reductions and output increase
 per predecessor transition. `transition_candidates.csv` records these branch-specific
 fronts, including `transition_reference_name` and `effort_from_previous`.
 
-Path metrics use equal factor weights and fixed normalization ranges observed in the
-reference input data. `effort_from_start` remains a descriptive start-to-state value;
-it is not used to choose the next point.
+Path costs use only factors listed in `--columns`; the remaining input/output columns
+still participate in the attainability check. Fixed normalization ranges come from the
+reference input. Factor weights can be supplied as, for example,
+`--factor-weights i1=0.6,i2=0.4`. `effort_from_start` uses the same weighted convention
+as `effort_from_previous`, but remains descriptive and is not used to choose the next
+point.
+
+Two optional stage budgets are applied before the transition Pareto front is built:
+
+- `--max-stage-effort 0.30` caps aggregate weighted normalized effort;
+- `--max-factor-changes i1=0.40,i2=0.20` caps normalized change separately by factor.
 
 ## Path Metrics
 
@@ -412,7 +420,7 @@ Pipeline'y zapisują raport automatycznie jako `path_metrics.csv` w katalogu dan
 Najważniejsze grupy metryk:
 
 - struktura ścieżki: `path_length`, `stage_count`, `unique_state_count`, `repeated_state_count`;
-- typy stanów: `real_state_count`, `fictive_state_count`, `mixed_state_path`;
+- typy stanów: `real_state_count`, `fictive_state_count`, `path_kind`, `mixed_state_path`;
 - metryki zgodne z paperem: `tc`, `msc`, `cdir`, `dr`, `md`, `bp`, `wbp`, `sbp`, `swbp`, `mcp`, `pyv`, `pym`, `apw`, `fw`, `ww`, `pc`, `opp`, `rr`;
 - koszt ruchu: `final_effort_from_start`, `max_effort_from_start`, `total_effort_movement`;
 - dopasowanie do milestone'ow: `final_milestone_gap`, `total_milestone_gap`, `mean_milestone_gap`, `max_milestone_gap`;
@@ -422,16 +430,28 @@ Najważniejsze grupy metryk:
 
 Uwagi do nowych metryk:
 
-- `tc`, `msc`, `cdir`, `dr`, `bp`, `wbp`, `sbp`, `swbp` i `mcp` są liczone z normalizowanych zmian między kolejnymi punktami. Pipeline używa stałych zakresów z wejściowych danych referencyjnych oraz równych wag czynników i etapów.
-- `pyv` i `pym` są liczone dla pierwszego dostępnego wskaźnika postępu, a warianty `pyv_best_efficiency`, `pyv_best_rank` itd. pokazują wyniki dla konkretnych wskaźników.
-- `apw`, `fw` i `ww` wybierają pierwszą dostępną szerokość robustności; szczegółowe warianty są w `apw_score`, `fw_score`, `ww_score`, `apw_rank`, `fw_rank`, `ww_rank`.
-- `pc` wymaga kolumn ze zbiorami referencyjnymi. Najpierw używa klasycznych peer-set kolumn, np. `peer_refs`, `peer_set` albo `reference_set`, jeśli są obecne. Pipeline przenosi też dostępne listy robust-reference z Java, które mogą służyć jako pomocniczy wariant ciągłości.
+- `tc`, `msc`, `bp`, `wbp`, `sbp`, `swbp` i `mcp` są liczone na modyfikowanych czynnikach. Domyślnie wagi są równe; metody 3–5 przyjmują `--factor-weights`, `--stage-weights` i `--width-state-weights`.
+- `cdir_endpoint` to koszt start → koniec konkretnej ścieżki. `cdir` jest jednym wspólnym, skończono-pulowym przybliżeniem najmniejszego ruchu bezpośredniego do celu: dla metod 3–5 z końcowej puli milestone'u, a dla metod strukturalnych z końców kompletnych ścieżek. `cdir_scope` zapisuje użyty zakres. Nie jest to dowód minimum w całej przestrzeni ciągłej.
+- `pyv` i `pym` używają wskaźnika zgodnego z metodą: `best_rank` dla metody rangi, `best_efficiency` dla metody efektywności, a w metodzie width wskaźnika głównego odpowiadającego rodzajowi width. Warianty szczegółowe pozostają w CSV.
+- ogólne `apw`, `fw` i `ww` używają `rank_width` dla metody best-rank i rank-width oraz `score_width` dla metod score; warianty obu typów pozostają w CSV.
+- `pc` jest liczone wyłącznie z prawdziwych zbiorów peer/reference. Jeśli adapter nie eksportuje peer sets, pole pozostaje puste. Ciągłość zbiorów relacji necessary/possible jest zapisywana osobno jako `rc`, aby nie podszywała się pod PC z paperu.
+- `md` powstaje tylko wtedy, gdy `milestone_gap` istnieje dla każdego rekomendowanego etapu; niepełne dane nie są już uśredniane po cichu.
+
+Każdy pipeline zapisuje także `path_selection.csv`, `path_pareto.csv` i `path_pareto_representatives.csv`. Pierwszy plik zawiera między innymi zwycięzcę `min TC`, zwycięzców kryteriów używanych w selekcji, wybór leksykograficzny i znormalizowany wybór ważony. Drugi zawiera pełny front Pareto ścieżek, a trzeci po jednym reprezentancie dla ścieżek o tym samym wektorze kryteriów. Dla metod numerycznych domyślny porządek leksykograficzny to `MD → MSC → SWBP → FW`, a dla metod strukturalnych `MSC → TC → SWBP → FW`.
 
 Modułu można użyć też na istniejącym pliku:
 
 ```powershell
 python .\python\path_metrics.py --paths .\output\...\paths.csv --method-name best_efficiency_path
 ```
+
+Kontrolowany przykład wszystkich pięciu metod na `Robot_18`, z dwoma zmienianymi inputami i stałymi outputami, uruchamia:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\run_robot_2d_five_method_experiment.ps1 -RefineFictiveCandidates
+```
+
+Skrypt najpierw tworzy wspólny snapshot wejścia DEA, potem uruchamia pięć pipeline'ów sekwencyjnie i zapisuje pełną konfigurację w `experiment_params.csv`.
 
 ### Template Do Testów Metryk
 

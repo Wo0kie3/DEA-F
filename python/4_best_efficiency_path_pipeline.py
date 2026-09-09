@@ -10,19 +10,26 @@ from candidate_refinement import (
 from java_runner import (
     export_candidate_robust_metrics_with_java,
     export_extreme_efficiencies_with_java,
+    export_extreme_ranks_with_java,
 )
 from path_metrics import write_path_metrics
+from path_selection import write_publication_selection
 from path_pipeline_common import (
     add_effort_columns,
     add_real_state_type,
     candidate_grid_steps,
     create_run_output_dir,
     enumerate_state_paths,
+    filter_states_to_modified_columns,
     generate_attainable_fictive_candidates,
     get_io_columns,
     linear_milestones,
+    minimum_direct_target_cost,
+    normalize_extreme_ranks,
     normalization_ranges_from_frame,
     parse_columns_arg,
+    parse_float_sequence,
+    parse_named_float_map,
     path_for_java,
     resolve_first_present,
     state_paths_to_frame,
@@ -69,6 +76,15 @@ def parse_args():
     )
     parser.add_argument("--global-search-samples", type=int, default=0)
     parser.add_argument("--global-search-random-state", type=int, default=142)
+    parser.add_argument("--factor-weights", default=None)
+    parser.add_argument("--stage-weights", default=None)
+    parser.add_argument("--width-state-weights", default=None)
+    parser.add_argument("--max-stage-effort", type=float, default=None)
+    parser.add_argument("--max-factor-changes", default=None)
+    parser.add_argument(
+        "--ranks-main-class",
+        default="org.example.CsvExtremeRanksExporter",
+    )
     return parser.parse_args()
 
 
@@ -112,6 +128,16 @@ def main():
         fallback_row=target_row,
     )
     columns_to_modify = parse_columns_arg(args.columns, io_cols)
+    factor_weights = parse_named_float_map(
+        args.factor_weights, columns_to_modify, "--factor-weights"
+    ) or None
+    max_factor_changes = parse_named_float_map(
+        args.max_factor_changes, columns_to_modify, "--max-factor-changes"
+    ) or None
+    stage_weights = parse_float_sequence(args.stage_weights, args.stages, "--stage-weights")
+    width_state_weights = parse_float_sequence(
+        args.width_state_weights, args.stages + 1, "--width-state-weights"
+    )
     grid_steps = candidate_grid_steps(
         df=df_input,
         target_row=target_row,
@@ -131,15 +157,33 @@ def main():
     )
 
     real_metrics = normalize_efficiency_metrics(pd.read_csv(eff_csv))
+    ranks_csv = run_dir / "extreme_ranks.csv"
+    export_extreme_ranks_with_java(
+        input_csv=path_for_java(args.input, args.java_entry),
+        output_csv=path_for_java(str(ranks_csv), args.java_entry),
+        java_entry=args.java_entry,
+        main_class=args.ranks_main_class,
+        maven_executable=args.maven_executable,
+    )
+    real_metrics = real_metrics.merge(
+        normalize_extreme_ranks(pd.read_csv(ranks_csv)),
+        on="name",
+        how="inner",
+        validate="one_to_one",
+    )
     real_metrics = add_real_state_type(
-        real_metrics[["name", "best_efficiency", "worst_efficiency", "score_width"]],
+        real_metrics,
         df_input,
+    )
+    real_metrics = filter_states_to_modified_columns(
+        real_metrics, target_row, io_cols, columns_to_modify
     )
     real_metrics = add_effort_columns(
         real_metrics,
         target_row,
-        io_cols,
+        columns_to_modify,
         normalization_ranges=normalization_ranges,
+        factor_weights=factor_weights,
     )
     real_metrics.to_csv(run_dir / "efficiency_metrics.csv", index=False)
 
@@ -173,8 +217,9 @@ def main():
         fictive_metrics = add_effort_columns(
             fictive_metrics,
             target_row,
-            io_cols,
+            columns_to_modify,
             normalization_ranges=normalization_ranges,
+            factor_weights=factor_weights,
         )
         fictive_metrics.to_csv(run_dir / "fictive_efficiency_metrics.csv", index=False)
 
@@ -223,8 +268,9 @@ def main():
             global_metrics = add_effort_columns(
                 global_metrics,
                 target_row,
-                io_cols,
+                columns_to_modify,
                 normalization_ranges=normalization_ranges,
+                factor_weights=factor_weights,
             )
             global_metrics.to_csv(run_dir / "global_search_metrics.csv", index=False)
 
@@ -306,6 +352,10 @@ def main():
                         global_metrics["best_efficiency"] >= current_milestone
                     ].copy()
                     if not global_eligible.empty:
+                        global_eligible["milestone_target"] = current_milestone
+                        global_eligible["milestone_gap"] = (
+                            global_eligible["best_efficiency"] - current_milestone
+                        ).abs()
                         eligible_fictive = pd.concat(
                             [eligible_fictive, global_eligible],
                             ignore_index=True,
@@ -314,8 +364,9 @@ def main():
                 eligible_fictive = add_effort_columns(
                     eligible_fictive,
                     target_row,
-                    io_cols,
+                    columns_to_modify,
                     normalization_ranges=normalization_ranges,
+                    factor_weights=factor_weights,
                 )
                 frames.append(eligible_fictive)
 
@@ -343,6 +394,11 @@ def main():
         normalization_ranges=normalization_ranges,
         minimal_inputs=[col for col in inputs if col in columns_to_modify],
         minimal_outputs=[col for col in outputs if col in columns_to_modify],
+        effort_inputs=[col for col in inputs if col in columns_to_modify],
+        effort_outputs=[col for col in outputs if col in columns_to_modify],
+        factor_weights=factor_weights,
+        max_stage_effort=args.max_stage_effort,
+        max_factor_changes=max_factor_changes,
         transition_log=transition_log,
     )
     pd.DataFrame(transition_log).to_csv(
@@ -351,13 +407,22 @@ def main():
     )
     final_paths_frame = state_paths_to_frame(paths, io_cols)
     final_paths_frame.to_csv(run_dir / "paths.csv", index=False)
-    write_path_metrics(
+    path_metrics = write_path_metrics(
         final_paths_frame,
         run_dir / "path_metrics.csv",
         method_name="best_efficiency_path",
         io_columns=io_cols,
         normalization_ranges=normalization_ranges,
+        adjustable_columns=columns_to_modify,
+        factor_weights=factor_weights,
+        stage_weights=stage_weights,
+        width_state_weights=width_state_weights,
+        progress_field="best_efficiency",
+        width_field="score_width",
+        direct_target_cost=minimum_direct_target_cost(stage_candidates[-1]),
+        cdir_scope="evaluated_final_stage_pool",
     )
+    write_publication_selection(path_metrics, run_dir, method_name="best_efficiency_path")
 
 
 if __name__ == "__main__":

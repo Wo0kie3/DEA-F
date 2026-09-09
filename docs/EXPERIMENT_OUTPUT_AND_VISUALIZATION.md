@@ -2,6 +2,14 @@
 
 Ten dokument opisuje sposób przygotowania porównywalnego eksperymentu DEA-F oraz jednego, samowystarczalnego pliku HTML z interaktywnym wykresem i krótką tabelą ścieżki. Referencyjny przykład korzysta z robotów `Robot_12`, `Robot_18`, `Robot_09`, `Robot_17` i `Robot_06` z Table 1 artykułu Baker i Talluri (1997).
 
+Do porównania **wszystkich pięciu metod** na jednej jednostce służy osobny, kontrolowany runner:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\run_robot_2d_five_method_experiment.ps1 -RefineFictiveCandidates
+```
+
+Domyślnie wybiera `Robot_18`, modyfikuje `i1,i2`, utrzymuje `o1,o2` na poziomie startowym, tworzy wspólny snapshot, uruchamia metody sekwencyjnie i zapisuje parametry, ziarna, wagi oraz budżety. Folder `front_path` zachowuje historyczną nazwę techniczną; w tekście publikacji tę metodę należy nazywać **necessary-layer path**, ponieważ jej warstwy pochodzą z DAG relacji necessary, a nie z peelingu frontów efektywności DEA.
+
 Aktualny wariant dotyczy:
 
 - metody `best_efficiency_path`;
@@ -203,12 +211,20 @@ foreach ($Target in $Targets) {
 }
 ```
 
-Automatyczny wybór ścieżki przebiega następująco:
+Certyfikat minimalności zachowuje historyczny wybór kontrolny:
 
 1. odrzuć ścieżki z naruszeniami osiągalności;
 2. znajdź minimalne `TC` z tolerancją `1e-9`;
 3. wśród remisów wybierz minimalne `MSC`;
 4. przy dalszym remisie użyj stabilnego porządku `path_id`.
+
+Do wyboru ścieżki pokazywanej w pracy używaj dodatkowych plików tworzonych przez każdy pipeline:
+
+- `path_selection.csv` — minimum pojedynczych kryteriów, wybór leksykograficzny i znormalizowany wybór ważony;
+- `path_pareto.csv` — niezdominowane ścieżki w przestrzeni kryteriów.
+- `path_pareto_representatives.csv` — po jednym reprezentancie dla identycznych (z tolerancją zapisu) wektorów kryteriów, co ogranicza wizualne duplikaty bez ukrywania pełnego frontu.
+
+Dla metod best-rank, best-efficiency i width domyślny wybór leksykograficzny minimalizuje kolejno `MD`, `MSC`, `SWBP`, `FW`. Dla metod Hasse i necessary-layer, które nie mają numerycznego odchylenia milestone'u, porządek to `MSC`, `TC`, `SWBP`, `FW`. W raporcie pokazuj też zwycięzcę `min TC`, jeśli różni się od wyboru publikacyjnego — taki kontrast ujawnia koszt ścisłego śledzenia kamieni milowych.
 
 ## 7. Generowanie jednego pliku HTML
 
@@ -374,7 +390,7 @@ Niepoprawne, zbyt mocne sformułowanie:
 
 > Wykres dowodzi globalnej minimalności ścieżki w całej ciągłej przestrzeni.
 
-Grid, refinement i próbkowanie dają skończoną pulę. Certyfikat minimalności dotyczy tej puli, a nie wszystkich możliwych punktów ciągłych. Ponadto obecne `DR` korzysta z `cdir` liczonego dla końca konkretnej ścieżki i nie jest jeszcze pełną implementacją definicji `Cdir` z artykułu.
+Grid, refinement i próbkowanie dają skończoną pulę. Certyfikat minimalności dotyczy tej puli, a nie wszystkich możliwych punktów ciągłych. `cdir_endpoint` opisuje bezpośredni koszt do końca konkretnej ścieżki, natomiast wspólny `cdir` jest minimum w ocenionej końcowej puli celu (lub wśród końców kompletnych ścieżek metod strukturalnych). `cdir_scope` ujawnia ten zakres. Jest to lepsza aproksymacja definicji `Cdir` z artykułu, ale nadal nie dowód minimum w całej przestrzeni ciągłej.
 
 ## 12. Dwa rodzaje wizualizacji
 

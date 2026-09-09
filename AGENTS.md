@@ -18,6 +18,9 @@ Python odpowiada za generowanie kandydatów, składanie ścieżek, metryki, rapo
 - `python/path_pipeline_common.py` — wspólna logika siatki, osiągalności, selekcji przejść i enumeracji ścieżek.
 - `python/candidate_refinement.py` — refinement, globalne próbkowanie i lokalne przeszukiwanie.
 - `python/path_metrics.py` — metryki całych ścieżek.
+- `python/path_selection.py` — wybór pojedynczy, leksykograficzny, Pareto i ważony.
+- `python/validate_controlled_experiment.py` — audyt spójności pięciu runów kontrolowanych.
+- `python/generate_five_method_robot_report.py` — samowystarczalny raport porównawczy przykładu z robotami.
 - `python/minimality_certificate.py` — certyfikat minimalności względem przebadanej puli.
 - `python/collect_path_metrics.py` — agregacja wyników metod.
 - `python/generate_dea_input_snapshot.py` — wspólny snapshot wejścia `X/Y`, bazowych metryk robust DEA, iteracyjnych frontów efektywności, macierzy NEC/POS, rankingu necessary i diagramu Hassego.
@@ -73,6 +76,8 @@ Zakresy normalizacji są stałe w obrębie eksperymentu i pochodzą z danych ref
 - `effort_from_start` — wartość opisowa względem początkowej DMU; nie używaj jej do wyboru następnego punktu.
 - `TC` — suma kosztów kolejnych przejść.
 - `MSC` — największy koszt pojedynczego przejścia.
+
+Koszty `effort_from_previous`, `effort_from_start`, `TC`, `MSC` i `cdir_endpoint` licz wyłącznie po kolumnach rzeczywiście modyfikowanych (`--columns`). Pełny zestaw inputów/outputów nadal służy do kontroli osiągalności i profilu operacyjnego. Domyślnie wagi czynników są równe; jawne `--factor-weights` normalizuj do sumy 1. Budżety `--max-stage-effort` i `--max-factor-changes` stosuj po filtrze osiągalności, ale przed wyznaczeniem frontu minimalnych zmian.
 
 W testach i raportach sprawdzaj, że `TC` zgadza się z sumą etapowych `effort_from_previous`, a `transition_reference_name` wskazuje rzeczywistego poprzednika.
 
@@ -131,6 +136,8 @@ Każdy run dostaje osobny katalog `run_<timestamp>` pod katalogiem metody. Najwa
 - `transition_candidates.csv` — branch-specific, osiągalne i niezdominowane następne kroki;
 - `paths.csv` — kompletne ścieżki wraz z metadanymi etapów;
 - `path_metrics.csv` — metryki całych ścieżek;
+- `path_selection.csv`, `path_pareto.csv` i `path_pareto_representatives.csv` — audytowalne wybory, pełny front Pareto i reprezentanci równoważnych wektorów metryk;
+- `validation_checks.csv` — kontrole spójności kontrolowanego zestawu pięciu metod;
 - `all_path_metrics.csv` i `method_summary.csv` — agregaty wielu metod.
 
 Pusty `paths.csv` może być poprawnym wynikiem: oznacza, że ocenione pule nie tworzą pełnej, osiągalnej ścieżki przez wszystkie milestone’y. Nie maskuj tego sztucznym rozluźnieniem warunków.
@@ -142,7 +149,9 @@ Nie opisuj obecnej implementacji jako w pełni zgodnej matematycznie z artykułe
 - Punkty fictive powstają przez grid, próbkowanie i refinement, a nie przez pełne ciągłe zadanie optymalizacyjne.
 - Certyfikat minimalności dotyczy wyłącznie faktycznie przebadanej puli.
 - Przycinanie do frontu Pareto i limity przejść są heurystyką; mogą usunąć lokalnie droższy krok prowadzący do ścieżki lepszej według innej metryki globalnej.
-- `cdir` w `path_metrics.py` jest obecnie bezpośrednim kosztem start → koniec konkretnej ścieżki. Nie jest minimum po wszystkich stanach końcowych osiągających cel. Dlatego `DR = TC / cdir` nie jest jeszcze pełną implementacją definicji `Cdir` z artykułu.
+- `cdir_endpoint` jest bezpośrednim kosztem start → koniec konkretnej ścieżki. `cdir` jest wspólnym minimum względem ocenionej końcowej puli milestone'u (metody 3–5) albo końców kompletnych ścieżek (metody 1–2), a `cdir_scope` zapisuje zakres. Nadal nie jest to analityczne minimum po całej ciągłej przestrzeni, więc `DR = TC / cdir` jest aproksymacją definicji z artykułu.
+- `PC` licz tylko z rzeczywistych zbiorów peer/reference. List necessary/possible nie nazywaj peer sets; ich pomocnicza miara ciągłości jest zapisywana jako `RC`.
+- Ogólne `PYV/PYM` i `APW/FW/WW` muszą odpowiadać semantyce metody, a nie pierwszej dostępnej kolumnie. Metoda rangi używa rangi i rank width; metoda efektywności score i score width; metoda width używa wskazanego rodzaju szerokości oraz odpowiadającego mu wskaźnika postępu.
 - Równe wagi czynników i zakresy z danych obserwowanych są świadomymi założeniami eksperymentalnymi.
 - Remisy metryk porównuj z tolerancją numeryczną; przy wyborze minimalnego `TC` używaj `MSC` jako kolejnego kryterium, zamiast polegać na różnicach float rzędu błędu maszynowego.
 

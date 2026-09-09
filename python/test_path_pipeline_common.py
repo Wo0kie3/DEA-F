@@ -4,7 +4,10 @@ import pandas as pd
 
 from path_metrics import summarize_paths
 from path_pipeline_common import (
+    add_effort_columns,
     enumerate_state_paths,
+    filter_attainable_named_paths,
+    filter_states_to_modified_columns,
     normalization_ranges_from_frame,
     select_transition_candidates,
     state_paths_to_frame,
@@ -128,6 +131,82 @@ class TransitionCandidateTests(unittest.TestCase):
         self.assertAlmostEqual(metrics.iloc[0]["msc"], 0.2)
         self.assertAlmostEqual(metrics.iloc[0]["cdir"], 0.3)
         self.assertAlmostEqual(metrics.iloc[0]["dr"], 1.0)
+
+    def test_cost_uses_only_adjustable_factors_and_same_convention(self):
+        start = pd.Series({"name": "start", "i1": 10.0, "i2": 10.0, "o1": 4.0})
+        candidate = pd.DataFrame(
+            [{"name": "candidate", "i1": 8.0, "i2": 9.0, "o1": 4.0}]
+        )
+        ranges = {"i1": 10.0, "i2": 10.0, "o1": 10.0}
+
+        with_start_effort = add_effort_columns(
+            candidate,
+            start,
+            ["i1", "i2"],
+            normalization_ranges=ranges,
+        )
+        selected = select_transition_candidates(
+            previous=start,
+            candidates=with_start_effort,
+            inputs=["i1", "i2"],
+            outputs=["o1"],
+            effort_inputs=["i1", "i2"],
+            effort_outputs=[],
+            normalization_ranges=ranges,
+        )
+
+        self.assertAlmostEqual(with_start_effort.iloc[0]["effort_from_start"], 0.15)
+        self.assertAlmostEqual(selected.iloc[0]["effort_from_previous"], 0.15)
+
+    def test_factor_weights_and_stage_budgets_are_applied_before_front(self):
+        previous = pd.Series({"name": "start", "i1": 10.0, "i2": 10.0})
+        candidates = pd.DataFrame(
+            [
+                {"name": "i1_heavy", "i1": 8.0, "i2": 10.0},
+                {"name": "balanced", "i1": 9.0, "i2": 9.0},
+            ]
+        )
+
+        selected = select_transition_candidates(
+            previous=previous,
+            candidates=candidates,
+            inputs=["i1", "i2"],
+            outputs=[],
+            normalization_ranges=self.ranges,
+            factor_weights={"i1": 0.75, "i2": 0.25},
+            max_stage_effort=0.11,
+            max_factor_changes={"i1": 0.15},
+        )
+
+        self.assertEqual(selected["name"].tolist(), ["balanced"])
+        self.assertAlmostEqual(selected.iloc[0]["effort_from_previous"], 0.1)
+
+    def test_real_states_respect_fixed_columns_and_stepwise_attainability(self):
+        target = pd.Series({"name": "start", "i1": 10.0, "o1": 5.0})
+        states = pd.DataFrame(
+            [
+                target.to_dict(),
+                {"name": "fixed_output", "i1": 9.0, "o1": 5.0},
+                {"name": "changed_output", "i1": 9.0, "o1": 6.0},
+                {"name": "backward", "i1": 11.0, "o1": 5.0},
+            ]
+        )
+
+        fixed = filter_states_to_modified_columns(
+            states,
+            target,
+            ["i1", "o1"],
+            ["i1"],
+        )
+        paths = filter_attainable_named_paths(
+            [["start", "fixed_output"], ["start", "backward"]],
+            fixed,
+            ["i1"],
+            ["o1"],
+        )
+
+        self.assertEqual(fixed["name"].tolist(), ["start", "fixed_output", "backward"])
+        self.assertEqual(paths, [["start", "fixed_output"]])
 
 
 if __name__ == "__main__":

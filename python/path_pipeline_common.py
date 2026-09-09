@@ -49,6 +49,58 @@ def resolve_first_present(df: pd.DataFrame, candidates: list[str]) -> str:
     raise KeyError(f"None of the expected columns found: {candidates}")
 
 
+def normalize_extreme_efficiencies(df_eff: pd.DataFrame) -> pd.DataFrame:
+    name_col = resolve_first_present(df_eff, ["name", "dmu_name", "dmu"])
+    best_col = resolve_first_present(
+        df_eff,
+        ["best_efficiency", "max_efficiency", "efficiency_max", "bestEfficiency"],
+    )
+    worst_col = resolve_first_present(
+        df_eff,
+        ["worst_efficiency", "min_efficiency", "efficiency_min", "worstEfficiency"],
+    )
+    result = df_eff.rename(
+        columns={name_col: "name", best_col: "best_efficiency", worst_col: "worst_efficiency"}
+    )[["name", "best_efficiency", "worst_efficiency"]].copy()
+    result["best_efficiency"] = pd.to_numeric(result["best_efficiency"])
+    result["worst_efficiency"] = pd.to_numeric(result["worst_efficiency"])
+    result["score_width"] = result["best_efficiency"] - result["worst_efficiency"]
+    return result
+
+
+def normalize_extreme_ranks(df_ranks: pd.DataFrame) -> pd.DataFrame:
+    name_col = resolve_first_present(df_ranks, ["name", "dmu_name", "dmu"])
+    best_col = resolve_first_present(
+        df_ranks,
+        ["best_rank", "min_rank", "rank_best", "bestRank"],
+    )
+    worst_col = resolve_first_present(
+        df_ranks,
+        ["worst_rank", "max_rank", "rank_worst", "worstRank"],
+    )
+    result = df_ranks.rename(
+        columns={name_col: "name", best_col: "best_rank", worst_col: "worst_rank"}
+    )[["name", "best_rank", "worst_rank"]].copy()
+    result["best_rank"] = pd.to_numeric(result["best_rank"]).astype(int)
+    result["worst_rank"] = pd.to_numeric(result["worst_rank"]).astype(int)
+    result["rank_width"] = result["worst_rank"] - result["best_rank"]
+    return result
+
+
+def merge_reference_robust_metrics(
+    df_input: pd.DataFrame,
+    efficiencies: pd.DataFrame,
+    ranks: pd.DataFrame,
+) -> pd.DataFrame:
+    metrics = normalize_extreme_efficiencies(efficiencies).merge(
+        normalize_extreme_ranks(ranks),
+        on="name",
+        how="inner",
+        validate="one_to_one",
+    )
+    return add_real_state_type(metrics, df_input)
+
+
 def build_relation_matrix(
     df_relations: pd.DataFrame,
     dmu_order: list[str],
@@ -608,6 +660,7 @@ def add_effort_columns(
     target_row: pd.Series,
     io_cols: list[str],
     normalization_ranges: dict[str, float] | None = None,
+    factor_weights: dict[str, float] | None = None,
 ) -> pd.DataFrame:
     out = df.copy()
     ranges = normalization_ranges or normalization_ranges_from_frame(
@@ -616,14 +669,126 @@ def add_effort_columns(
         fallback_row=target_row,
     )
 
+    weights = normalized_factor_weights(io_cols, factor_weights)
     effort = []
     for _, row in out.iterrows():
-        total = 0.0
-        for col in io_cols:
-            total += abs(float(row[col]) - float(target_row[col])) / ranges[col]
-        effort.append(total)
+        effort.append(
+            sum(
+                weights[col]
+                * abs(float(row[col]) - float(target_row[col]))
+                / ranges[col]
+                for col in io_cols
+            )
+        )
     out["effort_from_start"] = effort
     return out
+
+
+def parse_named_float_map(
+    value: str | None,
+    allowed_names: list[str],
+    option_name: str,
+) -> dict[str, float]:
+    if value is None or not str(value).strip():
+        return {}
+
+    allowed = set(allowed_names)
+    parsed = {}
+    for item in str(value).split(","):
+        if "=" not in item:
+            raise ValueError(f"{option_name} entries must use name=value syntax.")
+        name, raw_value = (part.strip() for part in item.split("=", 1))
+        if name not in allowed:
+            raise ValueError(
+                f"Unknown factor '{name}' in {option_name}; allowed: {sorted(allowed)}."
+            )
+        number = float(raw_value)
+        if number < 0:
+            raise ValueError(f"{option_name} values must be non-negative.")
+        parsed[name] = number
+    return parsed
+
+
+def parse_float_sequence(value: str | None, expected_length: int, option_name: str) -> list[float] | None:
+    if value is None or not str(value).strip():
+        return None
+    parsed = [float(part.strip()) for part in str(value).split(",") if part.strip()]
+    if len(parsed) != expected_length:
+        raise ValueError(
+            f"{option_name} requires {expected_length} comma-separated values; got {len(parsed)}."
+        )
+    if any(number < 0 for number in parsed) or sum(parsed) <= 0:
+        raise ValueError(f"{option_name} values must be non-negative with a positive sum.")
+    total = sum(parsed)
+    return [number / total for number in parsed]
+
+
+def normalized_factor_weights(
+    factors: list[str],
+    factor_weights: dict[str, float] | None = None,
+) -> dict[str, float]:
+    if not factors:
+        return {}
+    raw = {
+        factor: float(factor_weights.get(factor, 1.0) if factor_weights else 1.0)
+        for factor in factors
+    }
+    if any(value < 0 for value in raw.values()) or sum(raw.values()) <= 0:
+        raise ValueError("Factor weights must be non-negative with a positive sum.")
+    total = sum(raw.values())
+    return {factor: value / total for factor, value in raw.items()}
+
+
+def minimum_direct_target_cost(final_stage_candidates: pd.DataFrame) -> float | None:
+    if final_stage_candidates.empty or "effort_from_start" not in final_stage_candidates.columns:
+        return None
+    values = pd.to_numeric(
+        final_stage_candidates["effort_from_start"],
+        errors="coerce",
+    ).dropna()
+    return float(values.min()) if not values.empty else None
+
+
+def filter_states_to_modified_columns(
+    frame: pd.DataFrame,
+    target_row: pd.Series,
+    io_cols: list[str],
+    columns_to_modify: list[str],
+    tolerance: float = 1e-9,
+) -> pd.DataFrame:
+    fixed_columns = [col for col in io_cols if col not in columns_to_modify]
+    if frame.empty or not fixed_columns:
+        return frame.copy().reset_index(drop=True)
+    mask = pd.Series(True, index=frame.index)
+    for col in fixed_columns:
+        mask &= (pd.to_numeric(frame[col], errors="coerce") - float(target_row[col])).abs() <= tolerance
+    return frame.loc[mask].copy().reset_index(drop=True)
+
+
+def filter_attainable_named_paths(
+    paths: list[list[str]],
+    state_data: pd.DataFrame,
+    inputs: list[str],
+    outputs: list[str],
+) -> list[list[str]]:
+    states = state_data.copy()
+    states["name"] = states["name"].astype(str)
+    by_name = states.set_index("name", drop=False)
+    filtered = []
+    for path in paths:
+        if any(str(name) not in by_name.index for name in path):
+            continue
+        if all(
+            is_attainable_transition(
+                by_name.loc[str(previous)],
+                by_name.loc[str(current)],
+                inputs,
+                outputs,
+            )
+            for previous, current in zip(path, path[1:])
+        ):
+            filtered.append(path)
+    return filtered
 
 
 def is_attainable_transition(previous: pd.Series, current: pd.Series, inputs: list[str], outputs: list[str]) -> bool:
@@ -642,19 +807,21 @@ def transition_effort(
     inputs: list[str],
     outputs: list[str],
     normalization_ranges: dict[str, float],
+    factor_weights: dict[str, float] | None = None,
 ) -> float:
     factors = [*inputs, *outputs]
     if not factors:
         return 0.0
 
+    weights = normalized_factor_weights(factors, factor_weights)
     total = 0.0
     for col in inputs:
         change = max(float(previous[col]) - float(current[col]), 0.0)
-        total += change / normalization_ranges[col]
+        total += weights[col] * change / normalization_ranges[col]
     for col in outputs:
         change = max(float(current[col]) - float(previous[col]), 0.0)
-        total += change / normalization_ranges[col]
-    return total / len(factors)
+        total += weights[col] * change / normalization_ranges[col]
+    return total
 
 
 def prune_minimal_transition_front(
@@ -707,12 +874,45 @@ def select_transition_candidates(
     minimal_inputs: list[str] | None = None,
     minimal_outputs: list[str] | None = None,
     transition_predicate: Callable[[pd.Series, pd.Series], bool] | None = None,
+    effort_inputs: list[str] | None = None,
+    effort_outputs: list[str] | None = None,
+    factor_weights: dict[str, float] | None = None,
+    max_stage_effort: float | None = None,
+    max_factor_changes: dict[str, float] | None = None,
 ) -> pd.DataFrame:
+    cost_inputs = inputs if effort_inputs is None else effort_inputs
+    cost_outputs = outputs if effort_outputs is None else effort_outputs
+    cost_factors = [*cost_inputs, *cost_outputs]
     eligible_indices = []
     for idx, candidate in candidates.iterrows():
         if not is_attainable_transition(previous, candidate, inputs, outputs):
             continue
         if transition_predicate is not None and not transition_predicate(previous, candidate):
+            continue
+        changes = {
+            col: max(float(previous[col]) - float(candidate[col]), 0.0) / normalization_ranges[col]
+            for col in cost_inputs
+        }
+        changes.update(
+            {
+                col: max(float(candidate[col]) - float(previous[col]), 0.0) / normalization_ranges[col]
+                for col in cost_outputs
+            }
+        )
+        if max_factor_changes and any(
+            changes.get(col, 0.0) > cap + 1e-9
+            for col, cap in max_factor_changes.items()
+            if col in cost_factors
+        ):
+            continue
+        if max_stage_effort is not None and transition_effort(
+            previous,
+            candidate,
+            cost_inputs,
+            cost_outputs,
+            normalization_ranges,
+            factor_weights,
+        ) > max_stage_effort + 1e-9:
             continue
         eligible_indices.append(idx)
 
@@ -724,17 +924,18 @@ def select_transition_candidates(
     front = prune_minimal_transition_front(
         eligible,
         previous=previous,
-        inputs=inputs if minimal_inputs is None else minimal_inputs,
-        outputs=outputs if minimal_outputs is None else minimal_outputs,
+        inputs=cost_inputs if minimal_inputs is None else minimal_inputs,
+        outputs=cost_outputs if minimal_outputs is None else minimal_outputs,
     )
     front_count = len(front)
     front["effort_from_previous"] = front.apply(
         lambda candidate: transition_effort(
             previous,
             candidate,
-            inputs,
-            outputs,
+            cost_inputs,
+            cost_outputs,
             normalization_ranges,
+            factor_weights,
         ),
         axis=1,
     )
@@ -767,6 +968,11 @@ def enumerate_state_paths(
     minimal_outputs: list[str] | None = None,
     transition_predicate: Callable[[pd.Series, pd.Series], bool] | None = None,
     transition_log: list[dict] | None = None,
+    effort_inputs: list[str] | None = None,
+    effort_outputs: list[str] | None = None,
+    factor_weights: dict[str, float] | None = None,
+    max_stage_effort: float | None = None,
+    max_factor_changes: dict[str, float] | None = None,
 ) -> list[list[pd.Series]]:
     paths = []
     ranges = normalization_ranges or {
@@ -799,6 +1005,11 @@ def enumerate_state_paths(
                 minimal_inputs=minimal_inputs,
                 minimal_outputs=minimal_outputs,
                 transition_predicate=transition_predicate,
+                effort_inputs=effort_inputs,
+                effort_outputs=effort_outputs,
+                factor_weights=factor_weights,
+                max_stage_effort=max_stage_effort,
+                max_factor_changes=max_factor_changes,
             )
             selection_cache[cache_key] = selected
             if transition_log is not None:

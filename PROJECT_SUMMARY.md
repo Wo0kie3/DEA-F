@@ -24,6 +24,9 @@ Projekt implementuje pięć pipeline'ów: ścieżkę po diagramie Hassego, histo
 | `python/path_pipeline_common.py` | Wspólne generowanie kandydatów, osiągalność, selekcja przejść i zapis ścieżek. |
 | `python/candidate_refinement.py` | Lokalna i globalna rafinacja kandydatów fictive. |
 | `python/path_metrics.py` | Obliczanie metryk jakości każdej ścieżki. |
+| `python/path_selection.py` | Pojedyncze, leksykograficzne, Pareto i ważone wybory ścieżek do raportu. |
+| `python/validate_controlled_experiment.py` | Automatyczna kontrola spójności wspólnego eksperymentu pięciu metod. |
+| `python/generate_five_method_robot_report.py` | Samowystarczalny raport HTML porównujący ścieżki dla Robot_18. |
 | `python/collect_path_metrics.py` | Łączenie metryk wszystkich metod w podsumowanie eksperymentu. |
 | `python/generate_dea_input_snapshot.py` | Bazowy snapshot `X/Y`, scores, rang, iteracyjnych frontów efektywności, macierzy NEC/POS, rankingu necessary i diagramu Hassego. |
 | `python/render_path_metrics_*.py` | Raporty Markdown i PDF. |
@@ -35,6 +38,7 @@ Projekt implementuje pięć pipeline'ów: ścieżkę po diagramie Hassego, histo
 | `examples/five_unit_2d/` | Lekka, referencyjna wersja interaktywnego porównania pięciu DMU. |
 | `input/robot_technology_table1.csv` | Dane 27 robotów z Table 1: koszt i powtarzalność jako inputy, udźwig i prędkość jako outputy. |
 | `run_edu_3d_experiment.ps1` | Uruchomienie wszystkich pięciu metod dla eksperymentu EDU 3D. |
+| `run_robot_2d_five_method_experiment.ps1` | Kontrolowany przykład pięciu metod dla Robot_18, dwóch inputów i stałych outputów. |
 | `output/` | Lokalne wyniki eksperymentów; katalog jest ignorowany przez Git. |
 
 Szczegółowy opis parametrów każdej metody i interpretacji wyników znajduje się w `README.md`.
@@ -49,11 +53,16 @@ Do projektu dodano także:
 
 - `transition_candidates.csv` z kandydatami i wysiłkiem liczonym od poprzedniego punktu;
 - automatyczny `path_metrics.csv` dla każdej metody;
+- automatyczne `path_selection.csv`, `path_pareto.csv` i `path_pareto_representatives.csv` z audytowalnym wyborem ścieżki;
 - wspólne zestawienia `all_path_metrics.csv` i `method_summary.csv`;
 - rafinację lokalną oraz próbkowanie globalne dla metod numerycznych;
 - raporty Markdown/PDF, wizualizacje 2D/3D i certyfikaty minimalności;
 - wspólny snapshot wejścia DEA prezentowany przed ścieżkami: dane `X/Y`, scores, rangi, iteracyjne fronty efektywności, NEC/POS, ranking necessary i krawędzie Hassego;
 - testy selekcji przejść, rafinacji i certyfikatu minimalności.
+
+Koszt przejścia jest liczony wyłącznie po czynnikach faktycznie modyfikowanych przez eksperyment, ze stałą normalizacją względem pełnego zbioru referencyjnego. Pozostałe inputy i outputy nadal uczestniczą w kontroli osiągalności. Pipeline'y wspierają wagi czynników, etapów i stanów width oraz budżet łącznego wysiłku etapu i limity zmian poszczególnych czynników.
+
+Każdy stan startowy i realny kandydat ma komplet skrajnych efektywności, rang i obu szerokości. `Cdir` jest obecnie przybliżeniem względem skończonej puli celów, z jawnym `cdir_scope`; nie jest analitycznym minimum w przestrzeni ciągłej. `PC` pozostaje puste bez rzeczywistych peer sets, natomiast pomocnicza ciągłość relacji necessary/possible ma osobną nazwę `RC`.
 
 ## Uruchomienie na nowym komputerze
 

@@ -19,12 +19,15 @@ ROBUST_METRICS = [
     "rank_width",
 ]
 
-REFERENCE_SET_FIELDS = [
+PEER_SET_FIELDS = [
     "peer_refs",
     "peer_set",
     "peers",
     "reference_set",
     "reference_refs",
+]
+
+RELATION_SET_FIELDS = [
     "candidate_necessary_over_refs",
     "candidate_possible_over_refs",
     "reference_necessary_over_candidate_refs",
@@ -50,10 +53,13 @@ SUMMARY_COLUMNS = [
     "real_state_count",
     "fictive_state_count",
     "mixed_state_path",
+    "path_kind",
     "rr",
     "tc",
     "msc",
     "cdir",
+    "cdir_endpoint",
+    "cdir_scope",
     "dr",
     "bp",
     "wbp",
@@ -92,14 +98,8 @@ SUMMARY_COLUMNS = [
     "pc_reference_set_pair_count",
     "pc_reference_refs",
     "pc_reference_refs_pair_count",
-    "pc_candidate_necessary_over_refs",
-    "pc_candidate_necessary_over_refs_pair_count",
-    "pc_candidate_possible_over_refs",
-    "pc_candidate_possible_over_refs_pair_count",
-    "pc_reference_necessary_over_candidate_refs",
-    "pc_reference_necessary_over_candidate_refs_pair_count",
-    "pc_reference_possible_over_candidate_refs",
-    "pc_reference_possible_over_candidate_refs_pair_count",
+    "rc",
+    "rc_pair_count",
     "opp",
     "final_effort_from_start",
     "max_effort_from_start",
@@ -352,6 +352,8 @@ def _normalized_modification_metrics(
     inputs: list[str],
     outputs: list[str],
     ranges: dict[str, float],
+    factor_weights: dict[str, float] | None = None,
+    stage_weights: list[float] | None = None,
 ) -> tuple[dict[str, float | None], list[float] | None]:
     factors = [*inputs, *outputs]
     stage_count = max(len(stage_indices) - 1, 0)
@@ -360,7 +362,26 @@ def _normalized_modification_metrics(
 
     modifications = {factor: [] for factor in factors}
     stage_efforts = []
-    factor_weight = 1.0 / len(factors)
+    raw_factor_weights = {
+        factor: float(factor_weights.get(factor, 1.0) if factor_weights else 1.0)
+        for factor in factors
+    }
+    factor_weight_sum = sum(raw_factor_weights.values())
+    if factor_weight_sum <= EPS or any(value < 0 for value in raw_factor_weights.values()):
+        raise ValueError("Factor weights must be non-negative with a positive sum.")
+    normalized_factor_weights = {
+        factor: value / factor_weight_sum
+        for factor, value in raw_factor_weights.items()
+    }
+    if stage_weights is None:
+        normalized_stage_weights = [1.0 / stage_count for _ in range(stage_count)]
+    else:
+        if len(stage_weights) != stage_count:
+            raise ValueError(f"Expected {stage_count} stage weights, got {len(stage_weights)}.")
+        if any(value < 0 for value in stage_weights) or sum(stage_weights) <= EPS:
+            raise ValueError("Stage weights must be non-negative with a positive sum.")
+        total_stage_weight = sum(stage_weights)
+        normalized_stage_weights = [value / total_stage_weight for value in stage_weights]
 
     for previous_stage, current_stage in zip(stage_indices, stage_indices[1:]):
         stage_values = []
@@ -370,24 +391,31 @@ def _normalized_modification_metrics(
                 return {}, None
             modifications[factor].append(delta)
             stage_values.append(delta)
-        stage_efforts.append(sum(factor_weight * value for value in stage_values))
+        stage_efforts.append(
+            sum(
+                normalized_factor_weights[factor] * value
+                for factor, value in zip(factors, stage_values)
+            )
+        )
 
     direct_values = [
         _direct_delta(row, stage_indices[0], stage_indices[-1], factor, inputs, ranges)
         for factor in factors
     ]
     if any(value is None for value in direct_values):
-        cdir = None
+        cdir_endpoint = None
     else:
-        cdir = sum(factor_weight * float(value) for value in direct_values)
+        cdir_endpoint = sum(
+            normalized_factor_weights[factor] * float(value)
+            for factor, value in zip(factors, direct_values)
+        )
 
     tc = sum(stage_efforts)
     msc = max(stage_efforts)
     metrics = {
         "tc": tc,
         "msc": msc,
-        "cdir": cdir,
-        "dr": _safe_div(tc, cdir) if cdir is not None else None,
+        "cdir_endpoint": cdir_endpoint,
     }
 
     active_factors = [
@@ -415,19 +443,22 @@ def _normalized_modification_metrics(
         active_count = len(active_factors)
         bp = factor_balance_sum / (active_count * stage_count)
 
-        factor_weights = {factor: 1.0 / active_count for factor in active_factors}
-        stage_weights = [1.0 / stage_count for _ in range(stage_count)]
+        active_weight_sum = sum(normalized_factor_weights[factor] for factor in active_factors)
+        active_factor_weights = {
+            factor: normalized_factor_weights[factor] / active_weight_sum
+            for factor in active_factors
+        }
         wbp = (1.0 / stage_count) * sum(
-            factor_weights[factor] * sum(terms)
+            active_factor_weights[factor] * sum(terms)
             for factor, terms in balance_terms_by_factor.items()
         )
         sbp = (1.0 / active_count) * sum(
-            sum(stage_weights[h] * terms[h] for h in range(stage_count))
+            sum(normalized_stage_weights[h] * terms[h] for h in range(stage_count))
             for terms in balance_terms_by_factor.values()
         )
         swbp = sum(
-            factor_weights[factor]
-            * sum(stage_weights[h] * terms[h] for h in range(stage_count))
+            active_factor_weights[factor]
+            * sum(normalized_stage_weights[h] * terms[h] for h in range(stage_count))
             for factor, terms in balance_terms_by_factor.items()
         )
 
@@ -522,8 +553,8 @@ def _add_series_summary(
     stage_indices: list[int],
     field: str,
 ):
-    values = _numeric_stage_values(row, stage_indices, field)
-    if not values:
+    values = _complete_numeric_stage_values(row, stage_indices, field)
+    if values is None or not values:
         return
 
     start = values[0]
@@ -540,27 +571,44 @@ def _add_series_summary(
         summary[f"{field}_reduction"] = start - final
 
 
-def _add_width_metrics(summary: dict, row: pd.Series, stage_indices: list[int]):
+def _add_width_metrics(
+    summary: dict,
+    row: pd.Series,
+    stage_indices: list[int],
+    width_field: str | None = None,
+    width_state_weights: list[float] | None = None,
+):
     width_specs = [
         ("score_width", "score"),
         ("rank_width", "rank"),
     ]
-    generic_set = False
     for field, suffix in width_specs:
         values = _complete_numeric_stage_values(row, stage_indices, field)
         if values is None:
             continue
         apw = sum(values) / len(values)
         fw = values[-1]
-        ww = apw
+        if width_state_weights is None:
+            ww = apw
+        else:
+            if len(width_state_weights) != len(values):
+                raise ValueError(
+                    f"Expected {len(values)} width-state weights, got {len(width_state_weights)}."
+                )
+            if any(weight < 0 for weight in width_state_weights) or sum(width_state_weights) <= EPS:
+                raise ValueError("Width-state weights must be non-negative with a positive sum.")
+            total_weight = sum(width_state_weights)
+            ww = sum(
+                value * weight / total_weight
+                for value, weight in zip(values, width_state_weights)
+            )
         summary[f"apw_{suffix}"] = apw
         summary[f"fw_{suffix}"] = fw
         summary[f"ww_{suffix}"] = ww
-        if not generic_set:
+        if field == width_field:
             summary["apw"] = apw
             summary["fw"] = fw
             summary["ww"] = ww
-            generic_set = True
 
 
 def _add_progress_yield_metrics(
@@ -568,11 +616,11 @@ def _add_progress_yield_metrics(
     row: pd.Series,
     stage_indices: list[int],
     stage_efforts: list[float] | None,
+    progress_field: str | None = None,
 ):
     if stage_efforts is None or len(stage_efforts) != max(len(stage_indices) - 1, 0):
         return
 
-    generic_set = False
     for field, sign in PROGRESS_FIELDS:
         values = _complete_numeric_stage_values(row, stage_indices, field)
         if values is None:
@@ -594,15 +642,20 @@ def _add_progress_yield_metrics(
         pym = min(yields)
         summary[f"pyv_{field}"] = pyv
         summary[f"pym_{field}"] = pym
-        if not generic_set:
+        if field == progress_field:
             summary["pyv"] = pyv
             summary["pym"] = pym
-            generic_set = True
 
 
-def _add_peer_continuity_metrics(summary: dict, row: pd.Series, stage_indices: list[int]):
+def _add_set_continuity_metrics(
+    summary: dict,
+    row: pd.Series,
+    stage_indices: list[int],
+    fields: list[str],
+    prefix: str,
+):
     generic_set = False
-    for field in REFERENCE_SET_FIELDS:
+    for field in fields:
         similarities = []
         for previous_stage, current_stage in zip(stage_indices, stage_indices[1:]):
             previous = _parse_ref_set(_value(row, previous_stage, field))
@@ -616,12 +669,12 @@ def _add_peer_continuity_metrics(summary: dict, row: pd.Series, stage_indices: l
         if not similarities:
             continue
 
-        pc = 1.0 - (sum(similarities) / len(similarities))
-        summary[f"pc_{field}"] = pc
-        summary[f"pc_{field}_pair_count"] = len(similarities)
+        continuity = 1.0 - (sum(similarities) / len(similarities))
+        summary[f"{prefix}_{field}"] = continuity
+        summary[f"{prefix}_{field}_pair_count"] = len(similarities)
         if not generic_set:
-            summary["pc"] = pc
-            summary["pc_pair_count"] = len(similarities)
+            summary[prefix] = continuity
+            summary[f"{prefix}_pair_count"] = len(similarities)
             generic_set = True
 
 
@@ -685,9 +738,26 @@ def summarize_path_row(
     outputs: list[str],
     normalization_ranges: dict[str, float],
     method_name: str | None = None,
+    factor_weights: dict[str, float] | None = None,
+    stage_weights: list[float] | None = None,
+    width_state_weights: list[float] | None = None,
+    progress_field: str | None = None,
+    width_field: str | None = None,
+    profile_inputs: list[str] | None = None,
+    profile_outputs: list[str] | None = None,
 ) -> dict:
     names = _named_stage_values(row, stage_indices)
     state_types = _state_types(row, stage_indices)
+
+    recommended_types = state_types[1:] if len(state_types) == len(stage_indices) else []
+    if recommended_types and all(value == "real" for value in recommended_types):
+        path_kind = "real"
+    elif recommended_types and all(value == "fictive" for value in recommended_types):
+        path_kind = "fictive"
+    elif recommended_types:
+        path_kind = "mixed"
+    else:
+        path_kind = None
 
     summary = {
         "method": method_name,
@@ -700,7 +770,8 @@ def summarize_path_row(
         "repeated_state_count": len(names) - len(set(names)),
         "real_state_count": state_types.count("real") if state_types else None,
         "fictive_state_count": state_types.count("fictive") if state_types else None,
-        "mixed_state_path": len(set(state_types)) > 1 if state_types else None,
+        "mixed_state_path": path_kind == "mixed" if path_kind else None,
+        "path_kind": path_kind,
         "rr": _realness_ratio(state_types, stage_indices),
     }
 
@@ -710,6 +781,8 @@ def summarize_path_row(
         inputs=inputs,
         outputs=outputs,
         ranges=normalization_ranges,
+        factor_weights=factor_weights,
+        stage_weights=stage_weights,
     )
     summary.update(normalized_metrics)
 
@@ -722,19 +795,45 @@ def summarize_path_row(
             for previous, current in zip(effort_values, effort_values[1:])
         )
 
-    gap_values = _numeric_stage_values(row, stage_indices, "milestone_gap")
-    if gap_values:
+    gap_values = _complete_numeric_stage_values(row, stage_indices[1:], "milestone_gap")
+    if gap_values is not None and gap_values:
         summary["final_milestone_gap"] = gap_values[-1]
         summary["total_milestone_gap"] = sum(gap_values)
         summary["mean_milestone_gap"] = sum(gap_values) / len(gap_values)
         summary["max_milestone_gap"] = max(gap_values)
         summary["md"] = summary["mean_milestone_gap"]
 
-    summary.update(_io_change_metrics(row, stage_indices, inputs, outputs))
-    _add_width_metrics(summary, row, stage_indices)
-    _add_progress_yield_metrics(summary, row, stage_indices, stage_efforts)
-    _add_peer_continuity_metrics(summary, row, stage_indices)
-    _add_operational_profile_metrics(summary, row, stage_indices, inputs, outputs)
+    summary.update(
+        _io_change_metrics(
+            row,
+            stage_indices,
+            inputs if profile_inputs is None else profile_inputs,
+            outputs if profile_outputs is None else profile_outputs,
+        )
+    )
+    _add_width_metrics(
+        summary,
+        row,
+        stage_indices,
+        width_field=width_field,
+        width_state_weights=width_state_weights,
+    )
+    _add_progress_yield_metrics(
+        summary,
+        row,
+        stage_indices,
+        stage_efforts,
+        progress_field=progress_field,
+    )
+    _add_set_continuity_metrics(summary, row, stage_indices, PEER_SET_FIELDS, "pc")
+    _add_set_continuity_metrics(summary, row, stage_indices, RELATION_SET_FIELDS, "rc")
+    _add_operational_profile_metrics(
+        summary,
+        row,
+        stage_indices,
+        inputs if profile_inputs is None else profile_inputs,
+        outputs if profile_outputs is None else profile_outputs,
+    )
 
     for metric in ROBUST_METRICS:
         _add_series_summary(summary, row, stage_indices, metric)
@@ -747,6 +846,14 @@ def summarize_paths(
     method_name: str | None = None,
     io_columns: list[str] | None = None,
     normalization_ranges: dict[str, float] | None = None,
+    adjustable_columns: list[str] | None = None,
+    factor_weights: dict[str, float] | None = None,
+    stage_weights: list[float] | None = None,
+    width_state_weights: list[float] | None = None,
+    progress_field: str | None = None,
+    width_field: str | None = None,
+    direct_target_cost: float | None = None,
+    cdir_scope: str | None = None,
 ) -> pd.DataFrame:
     if paths.empty:
         return pd.DataFrame(columns=SUMMARY_COLUMNS)
@@ -754,12 +861,24 @@ def summarize_paths(
     stage_indices = discover_stage_indices(paths.columns)
     discovered_inputs, discovered_outputs = discover_io_columns(paths.columns)
     if io_columns is None:
-        inputs = discovered_inputs
-        outputs = discovered_outputs
+        profile_inputs = discovered_inputs
+        profile_outputs = discovered_outputs
     else:
         requested = set(io_columns)
-        inputs = [col for col in discovered_inputs if col in requested]
-        outputs = [col for col in discovered_outputs if col in requested]
+        profile_inputs = [col for col in discovered_inputs if col in requested]
+        profile_outputs = [col for col in discovered_outputs if col in requested]
+    adjustable = set(adjustable_columns or [*profile_inputs, *profile_outputs])
+    inputs = [col for col in profile_inputs if col in adjustable]
+    outputs = [col for col in profile_outputs if col in adjustable]
+
+    if progress_field is None:
+        progress_field = "best_rank" if method_name == "best_rank_path" else "best_efficiency"
+    if width_field is None:
+        width_field = (
+            "rank_width"
+            if method_name == "best_rank_path"
+            else "score_width"
+        )
 
     ranges = normalization_ranges or _normalization_ranges(
         paths,
@@ -777,10 +896,33 @@ def summarize_paths(
             outputs=outputs,
             normalization_ranges=ranges,
             method_name=method_name,
+            factor_weights=factor_weights,
+            stage_weights=stage_weights,
+            width_state_weights=width_state_weights,
+            progress_field=progress_field,
+            width_field=width_field,
+            profile_inputs=profile_inputs,
+            profile_outputs=profile_outputs,
         )
         for _, row in paths.iterrows()
     ]
     summary = pd.DataFrame(rows)
+
+    endpoint_costs = pd.to_numeric(summary.get("cdir_endpoint"), errors="coerce")
+    if direct_target_cost is None:
+        finite_costs = endpoint_costs.dropna()
+        cdir = float(finite_costs.min()) if not finite_costs.empty else None
+        effective_scope = cdir_scope or "complete_path_endpoints"
+    else:
+        cdir = float(direct_target_cost)
+        effective_scope = cdir_scope or "evaluated_final_stage_pool"
+    summary["cdir"] = cdir
+    summary["cdir_scope"] = effective_scope
+    summary["dr"] = summary["tc"].apply(
+        lambda tc: _safe_div(float(tc), cdir)
+        if cdir is not None and pd.notna(tc)
+        else None
+    )
 
     ordered_columns = [col for col in SUMMARY_COLUMNS if col in summary.columns]
     extra_columns = [col for col in summary.columns if col not in ordered_columns]
@@ -793,12 +935,28 @@ def write_path_metrics(
     method_name: str | None = None,
     io_columns: list[str] | None = None,
     normalization_ranges: dict[str, float] | None = None,
+    adjustable_columns: list[str] | None = None,
+    factor_weights: dict[str, float] | None = None,
+    stage_weights: list[float] | None = None,
+    width_state_weights: list[float] | None = None,
+    progress_field: str | None = None,
+    width_field: str | None = None,
+    direct_target_cost: float | None = None,
+    cdir_scope: str | None = None,
 ) -> pd.DataFrame:
     metrics = summarize_paths(
         paths,
         method_name=method_name,
         io_columns=io_columns,
         normalization_ranges=normalization_ranges,
+        adjustable_columns=adjustable_columns,
+        factor_weights=factor_weights,
+        stage_weights=stage_weights,
+        width_state_weights=width_state_weights,
+        progress_field=progress_field,
+        width_field=width_field,
+        direct_target_cost=direct_target_cost,
+        cdir_scope=cdir_scope,
     )
     output_path = Path(output_csv)
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -812,6 +970,14 @@ def parse_args():
     parser.add_argument("--output", default=None)
     parser.add_argument("--method-name", default=None)
     parser.add_argument("--io-columns", default=None)
+    parser.add_argument("--adjustable-columns", default=None)
+    parser.add_argument("--factor-weights", default=None)
+    parser.add_argument("--stage-weights", default=None)
+    parser.add_argument("--width-state-weights", default=None)
+    parser.add_argument("--progress-field", default=None)
+    parser.add_argument("--width-field", default=None)
+    parser.add_argument("--direct-target-cost", type=float, default=None)
+    parser.add_argument("--cdir-scope", default=None)
     return parser.parse_args()
 
 
@@ -822,16 +988,54 @@ def main():
     io_columns = None
     if args.io_columns:
         io_columns = [part.strip() for part in args.io_columns.split(",") if part.strip()]
+    adjustable_columns = None
+    if args.adjustable_columns:
+        adjustable_columns = [
+            part.strip() for part in args.adjustable_columns.split(",") if part.strip()
+        ]
 
     try:
         paths = pd.read_csv(paths_csv)
     except pd.errors.EmptyDataError:
         paths = pd.DataFrame()
+    factor_weights = None
+    if args.factor_weights:
+        allowed = adjustable_columns or io_columns
+        if not allowed:
+            discovered_inputs, discovered_outputs = discover_io_columns(paths.columns)
+            allowed = [*discovered_inputs, *discovered_outputs]
+        factor_weights = {}
+        for item in args.factor_weights.split(","):
+            name, raw = (part.strip() for part in item.split("=", 1))
+            if name not in allowed:
+                raise ValueError(f"Unknown factor weight: {name}.")
+            factor_weights[name] = float(raw)
+    stage_count = max(len(discover_stage_indices(paths.columns)) - 1, 0)
+    stage_weights = (
+        [float(part.strip()) for part in args.stage_weights.split(",") if part.strip()]
+        if args.stage_weights
+        else None
+    )
+    width_state_weights = (
+        [float(part.strip()) for part in args.width_state_weights.split(",") if part.strip()]
+        if args.width_state_weights
+        else None
+    )
+    if stage_weights is not None and len(stage_weights) != stage_count:
+        raise ValueError(f"Expected {stage_count} stage weights, got {len(stage_weights)}.")
     write_path_metrics(
         paths=paths,
         output_csv=output_csv,
         method_name=args.method_name,
         io_columns=io_columns,
+        adjustable_columns=adjustable_columns,
+        factor_weights=factor_weights,
+        stage_weights=stage_weights,
+        width_state_weights=width_state_weights,
+        progress_field=args.progress_field,
+        width_field=args.width_field,
+        direct_target_cost=args.direct_target_cost,
+        cdir_scope=args.cdir_scope,
     )
 
 
