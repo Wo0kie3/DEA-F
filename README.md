@@ -1,5 +1,8 @@
 # DEA-F: Robust Improvement Paths
 
+Raport referencyjny do przywoływania w kolejnych wątkach:
+[EDU-DMU03-JOINT](docs/REPORT_EDU_DMU03_JOINT.md).
+
 ## Hasse: POS parami i wspólne wagi
 
 ### Piec metod ze wspolnym celem koncowym

@@ -4,6 +4,10 @@ Ten plik dotyczy całego repozytorium. Jest instrukcją roboczą dla agentów ro
 
 ## Cel projektu
 
+Raport referencyjny **EDU-DMU03-JOINT** jest opisany w
+`docs/REPORT_EDU_DMU03_JOINT.md`. Gdy użytkownik odwołuje się do tego raportu,
+przeczytaj kartę, parametry i wskazany artefakt; nie utożsamiaj go z innymi runami EDU.
+
 DEA-F generuje i ocenia robust improvement paths w Data Envelopment Analysis. Dla wybranej jednostki decyzyjnej (DMU) szukamy kolejnych osiągalnych stanów, które zmniejszają inputy i/lub zwiększają outputy oraz realizują cele dotyczące relacji robust DEA, rangi, efektywności albo stabilności oceny.
 
 Python odpowiada za generowanie kandydatów, składanie ścieżek, metryki, raporty i wizualizacje. Java uruchamiana przez Maven oblicza dokładne miary robust DEA z biblioteki `io.github.alabijak:dea-robustness:0.1-SNAPSHOT`.
