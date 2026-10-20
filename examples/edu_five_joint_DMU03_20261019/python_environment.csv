@@ -1,0 +1,6 @@
+package,version
+python,3.11.3
+pandas,2.0.0
+numpy,1.24.2
+networkx,2.8.8
+plotly,6.5.1

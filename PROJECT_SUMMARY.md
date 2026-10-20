@@ -1,6 +1,80 @@
 # Podsumowanie projektu DEA-F
 
-Stan dokumentu: 12 sierpnia 2026 r.
+Stan dokumentu: 19 października 2026 r.
+
+## Porównanie celów Hasse/POS
+
+Raport pieciu metod zawiera selektor wszystkich 20 metryk osobno dla kazdej
+metody. `metric_path_explorer.py` porownuje wszystkie skonczone zapisane wartosci,
+uwzglednia kierunek optymalizacji, raportuje remisy/stale kryteria i eksportuje
+rownorzedne ID. Wykresy reprezentantow maja audyt frontow od rzeczywistego
+poprzednika. Interaktywny wybor aktualizuje etapy i rachunki; nie przelicza DEA
+ani nie poszerza puli sciezek. Limity i lokalne pruning pozostaja ograniczeniem
+wnioskowania o optimum globalnym. Podsumowanie metod pokazuje wybor domyslny.
+
+Nowe porownanie pieciu metod z `--final-goal joint` narzuca wspolne wagi na
+ostatnim etapie kazdej metody. Hasse korzysta z POS po grafie, metoda 2 zachowuje
+warstwy NEC, a metody liczbowe lacza joint z wlasnym koncowym progiem.
+Filtr jest stosowany przed wyborem frontu przejscia. Raport ma piec wynikow,
+audyt warunku koncowego i swiadectwa wag. Historyczne tryby nie sa nadpisywane.
+
+`run_shared_pool_methods.py` przywraca piec historycznych metod do raportu POS.
+Wszystkie siedem wariantow uzywa identycznej puli ocenionych punktow; nowe
+`--shared-pool` eliminuje powtorna ocene kandydatow, a nie obliczenia sciezek.
+Wybor sciezek, cele i skale metryk zachowuja semantyke kazdej metody.
+Historyczne warianty NEC sa podpisane osobno. Output zawiera wykresy i 20 metryk
+z rachunkami dla wszystkich dostepnych sciezek. Brak pelnej sciezki jest jawny.
+
+Opcja `--grid-levels` rozszerza pule o gestsza siatke w granicach zrodla.
+`--jitter-samples`, `--jitter-fraction` i `--sampling-seed` steruja malymi
+jednostajnymi odchyleniami w lokalnych pudelkach. Oryginalne punkty sa zachowane,
+outputy stale, obie wersje POS dostaja identyczne probki ocenione w Javie (partie 500).
+Pochodzenie zapisuje `candidate_sampling.csv`; raport podaje parametry i liczebnosci.
+
+Nowy `compare_hasse_pos_variants.py` bada dwa warianty na identycznej źródłowej
+siatce fictive. Graf NEC wyznacza ścieżki, pośrednie cele wymagają POS nad pojedynczą
+jednostką, a ostatni krok dotyczy wszystkich maksymalnych klas NEC (również poza
+daną gałęzią). `pairwise` sprawdza każdą relację osobno; `joint` szuka jednego
+układu wag dla wszystkich celów. Nowy adapter Java zapisuje wagi, optimum i flagi.
+LP wspólny używa normalizacji `v*x(z)=1`, ograniczenia `u*y(z)<=1` oraz
+`u*y(t)<=v*x(t)` dla każdego celu; maksymalizuje `u*y(z)` i sprawdza próg `1-1e-9`.
+Zakłada dodatnie dane i nieograniczone nieujemne wagi CCR. Nie oznacza to certyfikatu
+silnej efektywności Pareto. Koszty, osiągalność i fronty nadal zależą od poprzednika.
+
+Wyniki są w nowym katalogu: `pairwise/`, `joint/`, `variant_summary.csv`,
+`graph_routes.json`, `top_targets.csv`, `possible_goals.csv`, świadectwa i audyt wag,
+pełne metryki oraz `hasse_pos_comparison.html`. Snapshot wejścia jest kopiowany
+ze źródła, a robust metryki kandydatów ponownie obliczane i sprawdzane ze źródłem.
+Historyczne eksperymenty pięciu metod i ich warunki NEC nie są nadpisywane.
+
+## Porównanie EDU
+
+`python/run_five_method_experiment.py` uruchamia sekwencyjnie wszystkie pięć metod
+na dwóch lub trzech inputach. W przykładzie EDU dla `DMU_03` zmieniamy `i1,i2,i3`,
+a `o1=0.905` pozostaje stałe. Polecenie reprodukcji znajduje się w README.
+`python/generate_five_method_report.py` tworzy jeden samowystarczalny HTML z pełnym
+wejściem DEA, macierzami NEC/POS, frontami efektywności, rankingiem NEC i diagramem
+Hassego. Porównanie ma wspólny wykres 3D, rzuty 2D oraz pięć osobnych wykresów etapów,
+badanych punktów, ich efektywności i frontów minimalnych zmian. Raport zapisuje audyt
+wybranych przejść. Eksport ścieżek zachowuje `milestone_*`, aby cel i pula konkretnej
+gałęzi były jednoznaczne.
+
+Raport prezentuje komplet 20 pozycji katalogu, w tym PC. Etap
+`complete_experiment_metrics.py` przelicza wszystkie zapisane ścieżki bez nowego
+przeszukiwania, zachowując wcześniejsze Cdir, wagi i wybory. Java wyznacza sumę
+peer sets wszystkich radialnie optymalnych rozwiązań input-oriented CCR na
+stałych oryginalnych DMU (max lambda_j > 1e-7, bez drugiej fazy slacków).
+`peer_theta` może przekroczyć 1 i nie zastępuje robust score; adapter wymaga
+ściśle dodatnich skończonych danych. PC i RC wymagają kompletu przejść ze startem.
+Znane puste zbiory zapisujemy jako `[]`, brak danych pozostaje brakiem danych.
+PYV/PYM dla zerowego kosztu kroku są jawnie niezdefiniowane. Pliki audytowe:
+`metric_completion.json`, `peer_evaluation_results.csv`, `metric_coverage.csv`
+i `metric_exceptions.csv`. Tabela wszystkich metryk wyborów:
+`selected_path_all_metrics.csv`; w HTML także benchmarki i odległości Jaccarda etapów.
+Każdy wynik pełnej tabeli HTML ma okienko z wzorem i podstawionymi wartościami
+(najechanie/Tab, przypięcie kliknięciem, zamknięcie Esc). Moduł
+`metric_calculation_details.py` weryfikuje zgodność rachunku z CSV; ślad obliczeń
+jest zapisany w `metric_calculation_details.json`. Nie wymaga to nowego eksperymentu.
 
 ## Cel projektu
 
@@ -10,14 +84,14 @@ DEA-F generuje i ocenia odporne ścieżki poprawy (robust improvement paths) w D
 - Java/Maven — dokładne obliczenia robust DEA z biblioteki `dea-robustness`;
 - CSV — dane wejściowe i wyniki kolejnych etapów eksperymentu.
 
-Projekt implementuje pięć pipeline'ów: ścieżkę po diagramie Hassego, historyczną ścieżkę przez warstwy rankingu necessary, ścieżkę najlepszej rangi, ścieżkę najlepszej efektywności oraz ścieżkę zmniejszającą szerokość robustności. Iteracyjne fronty efektywności są obecnie wyznaczane w snapshotcie wejściowym i prezentowane w raporcie; nie należy ich utożsamiać z pipeline'em 2.
+Projekt implementuje pięć pipeline'ów: ścieżkę po diagramie Hassego, ścieżkę przez warstwy rankingu necessary, ścieżkę najlepszej rangi, ścieżkę najlepszej efektywności oraz ścieżkę zmniejszającą szerokość robustności. Iteracyjne fronty efektywności są obecnie wyznaczane w snapshotcie wejściowym i prezentowane w raporcie; nie należy ich utożsamiać z pipeline'em 2.
 
 ## Najważniejsze elementy repozytorium
 
 | Ścieżka | Rola |
 |---|---|
 | `python/1_hasse_path_pipeline.py` | Metoda 1: przejścia po relacji necessary i diagramie Hassego. |
-| `python/2_front_path_pipeline.py` | Metoda 2: historycznie nazwana ścieżka po warstwach rankingu necessary; nie jest peelingiem frontów efektywności. |
+| `python/2_necessary_layer_path_pipeline.py` | Metoda 2: ścieżka po warstwach rankingu necessary; nie jest peelingiem frontów efektywności. |
 | `python/3_best_rank_path_pipeline.py` | Metoda 3: poprawa najlepszej osiągalnej rangi. |
 | `python/4_best_efficiency_path_pipeline.py` | Metoda 4: poprawa najlepszej efektywności. |
 | `python/5_robustness_width_path_pipeline.py` | Metoda 5: redukcja szerokości score lub rank. |

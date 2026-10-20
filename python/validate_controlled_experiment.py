@@ -1,4 +1,5 @@
 import argparse
+import json
 from pathlib import Path
 
 import pandas as pd
@@ -51,7 +52,20 @@ def validate_experiment(
             record(method, "complete_run", False, str(error))
             continue
 
+        if paths.empty and (run_dir/'final_goal.json').exists():
+            record(method,'no_complete_joint_path',True,'No complete path in the evaluated pool; goal not relaxed')
+            continue
         record(method, "nonempty_complete_paths", not paths.empty, f"path_count={len(paths)}")
+        if (run_dir/'final_goal.json').exists() and not paths.empty:
+            goal = json.loads((run_dir/'final_goal.json').read_text(encoding='utf-8'))
+            pool = pd.read_csv(run_dir/'fictive_candidate_metrics.csv').set_index('name')
+            violations = 0
+            for _, path in paths.iterrows():
+                name = path[f"stage_{int(path.path_length):02d}_name"]
+                if name not in pool.index or pool.loc[name,'joint_top'] != True:
+                    violations += 1
+            record(method,'common_weight_final_goal',violations==0,
+                   f"violations={violations}; targets={goal['targets']}")
         if max_paths is not None:
             record(
                 method,

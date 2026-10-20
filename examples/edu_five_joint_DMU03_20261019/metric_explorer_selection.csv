@@ -1,0 +1,101 @@
+metric,direction,description,tested_paths,finite_paths,excluded_paths,tie_count,constant,path_id,optimum,selected_value,method
+tc,lower_better,"Całkowity znormalizowany wysiłek ścieżki, czyli suma ważonych zmian między kolejnymi punktami wszystkich etapów.",20000,20000,0,6,False,path_013653,0.2660448414783675,0.2660448414783675,hasse_path
+msc,lower_better,Największy wysiłek pojedynczego etapu; pokazuje najtrudniejszy krok.,20000,20000,0,2,False,path_013653,0.0997668155543878,0.0997668155543878,hasse_path
+cdir,lower_better,Najmniejszy znormalizowany wysiłek bezpośredni do celu znaleziony w ocenionej puli końcowej.,20000,20000,0,20000,True,path_013653,0.2660448414783675,0.2660448414783675,hasse_path
+cdir_endpoint,lower_better,Znormalizowany wysiłek bezpośredni od startu do końca konkretnej ścieżki.,20000,20000,0,6,False,path_013653,0.2660448414783675,0.2660448414783675,hasse_path
+dr,lower_better,Relatywny objazd ścieżki etapowej względem ruchu bezpośredniego.,20000,20000,0,6,False,path_013653,1.0,1.0000000000000002,hasse_path
+md,lower_better,Średnie odchylenie od zaplanowanych milestone'ów.,20000,20000,0,20000,True,path_013653,0.0,0.0,hasse_path
+bp,lower_better,Nieważona równomierność zmian w etapach; karze nierówny rozkład całkowitej zmiany danego czynnika.,20000,20000,0,2,False,path_013653,0.0034722222222222,0.0034722222222222,hasse_path
+wbp,lower_better,Równomierność zmian z wagami czynników.,20000,20000,0,2,False,path_013653,0.0034722222222222,0.0034722222222222,hasse_path
+sbp,lower_better,Równomierność zmian z wagami etapów.,20000,20000,0,2,False,path_013653,0.0034722222222222,0.0034722222222222,hasse_path
+swbp,lower_better,Równomierność zmian z wagami czynników i etapów jednocześnie.,20000,20000,0,2,False,path_013653,0.0034722222222222,0.0034722222222222,hasse_path
+mcp,lower_better,Największy udział jednego etapu w całkowitej zmianie dowolnego czynnika.,20000,20000,0,2,False,path_013653,0.3750000000000001,0.3750000000000001,hasse_path
+pyv,lower_better,Zmienność postępu uzyskanego z jednostki wysiłku w kolejnych etapach.,20000,19969,31,1,False,path_015632,9.818126326271958e-05,9.818126326271958e-05,hasse_path
+pym,higher_better,Najgorszy etapowy postęp na jednostkę wysiłku.,20000,19969,31,1,False,path_003376,1.0187331069988592,1.0187331069988592,hasse_path
+apw,lower_better,Średnia szerokość przedziału robustności na ścieżce.,20000,20000,0,1,False,path_006728,0.2235931781,0.2235931781,hasse_path
+fw,lower_better,Końcowa szerokość przedziału robustności.,20000,20000,0,1,False,path_005158,0.0647129024,0.0647129024,hasse_path
+ww,lower_better,Ważona szerokość robustności na ścieżce.,20000,20000,0,1,False,path_006728,0.2235931781,0.2235931781,hasse_path
+pc,lower_better,Średnia odległość Jaccarda prawdziwych zbiorów peer/reference między kolejnymi etapami.,20000,20000,0,17041,False,path_010038,0.0,0.0,hasse_path
+rc,lower_better,Pomocnicza nieciągłość zbiorów relacji necessary/possible między etapami.,20000,20000,0,6658,False,path_013653,0.0,0.0,hasse_path
+opp,lower_better,Odległość L1 między strukturą input/output w etapach a strukturą początkową.,20000,20000,0,1,False,path_004260,0.0283403124130184,0.0283403124130184,hasse_path
+rr,higher_better,"Udział etapów po starcie, które odpowiadają realnym obserwowanym jednostkom.",20000,20000,0,20000,True,path_013653,0.0,0.0,hasse_path
+tc,lower_better,"Całkowity znormalizowany wysiłek ścieżki, czyli suma ważonych zmian między kolejnymi punktami wszystkich etapów.",20000,20000,0,20000,True,path_000009,0.7417391612991753,0.7417391612991753,front_path
+msc,lower_better,Największy wysiłek pojedynczego etapu; pokazuje najtrudniejszy krok.,20000,20000,0,184,False,path_000009,0.2540678619810365,0.2540678619810365,front_path
+cdir,lower_better,Najmniejszy znormalizowany wysiłek bezpośredni do celu znaleziony w ocenionej puli końcowej.,20000,20000,0,20000,True,path_000009,0.7417391612991753,0.7417391612991753,front_path
+cdir_endpoint,lower_better,Znormalizowany wysiłek bezpośredni od startu do końca konkretnej ścieżki.,20000,20000,0,20000,True,path_000009,0.7417391612991753,0.7417391612991753,front_path
+dr,lower_better,Relatywny objazd ścieżki etapowej względem ruchu bezpośredniego.,20000,20000,0,20000,True,path_000009,1.0,1.0,front_path
+md,lower_better,Średnie odchylenie od zaplanowanych milestone'ów.,20000,20000,0,20000,True,path_000009,0.0,0.0,front_path
+bp,lower_better,Nieważona równomierność zmian w etapach; karze nierówny rozkład całkowitej zmiany danego czynnika.,20000,20000,0,92,False,path_000119,0.0125025159517889,0.0125025159517889,front_path
+wbp,lower_better,Równomierność zmian z wagami czynników.,20000,20000,0,92,False,path_000119,0.0125025159517889,0.0125025159517889,front_path
+sbp,lower_better,Równomierność zmian z wagami etapów.,20000,20000,0,92,False,path_000119,0.0125025159517889,0.0125025159517889,front_path
+swbp,lower_better,Równomierność zmian z wagami czynników i etapów jednocześnie.,20000,20000,0,92,False,path_000119,0.0125025159517889,0.0125025159517889,front_path
+mcp,lower_better,Największy udział jednego etapu w całkowitej zmianie dowolnego czynnika.,20000,20000,0,184,False,path_000089,0.4733588546975311,0.4733588546975311,front_path
+pyv,lower_better,Zmienność postępu uzyskanego z jednostki wysiłku w kolejnych etapach.,20000,20000,0,92,False,path_000006,0.0001478249021699,0.0001478249021699,front_path
+pym,higher_better,Najgorszy etapowy postęp na jednostkę wysiłku.,20000,20000,0,92,False,path_000006,0.381477763241201,0.381477763241201,front_path
+apw,lower_better,Średnia szerokość przedziału robustności na ścieżce.,20000,20000,0,91,False,path_000208,0.188053705325,0.188053705325,front_path
+fw,lower_better,Końcowa szerokość przedziału robustności.,20000,20000,0,20000,True,path_000009,0.0219388306,0.0219388306,front_path
+ww,lower_better,Ważona szerokość robustności na ścieżce.,20000,20000,0,91,False,path_000208,0.188053705325,0.188053705325,front_path
+pc,lower_better,Średnia odległość Jaccarda prawdziwych zbiorów peer/reference między kolejnymi etapami.,20000,20000,0,14406,False,path_000008,0.0,0.0,front_path
+rc,lower_better,Pomocnicza nieciągłość zbiorów relacji necessary/possible między etapami.,20000,20000,0,276,False,path_000024,0.4947712418300654,0.4947712418300654,front_path
+opp,lower_better,Odległość L1 między strukturą input/output w etapach a strukturą początkową.,20000,20000,0,91,False,path_000198,0.346874822516367,0.346874822516367,front_path
+rr,higher_better,"Udział etapów po starcie, które odpowiadają realnym obserwowanym jednostkom.",20000,20000,0,20000,True,path_000009,0.0,0.0,front_path
+tc,lower_better,"Całkowity znormalizowany wysiłek ścieżki, czyli suma ważonych zmian między kolejnymi punktami wszystkich etapów.",3351,3351,0,1,False,path_000001,0.2712256173854957,0.2712256173854957,best_rank_path
+msc,lower_better,Największy wysiłek pojedynczego etapu; pokazuje najtrudniejszy krok.,3351,3351,0,1,False,path_001156,0.106198962041668,0.106198962041668,best_rank_path
+cdir,lower_better,Najmniejszy znormalizowany wysiłek bezpośredni do celu znaleziony w ocenionej puli końcowej.,3351,3351,0,3351,True,path_000001,0.2660448414783675,0.2660448414783675,best_rank_path
+cdir_endpoint,lower_better,Znormalizowany wysiłek bezpośredni od startu do końca konkretnej ścieżki.,3351,3351,0,1,False,path_000001,0.2712256173854957,0.2712256173854957,best_rank_path
+dr,lower_better,Relatywny objazd ścieżki etapowej względem ruchu bezpośredniego.,3351,3351,0,1,False,path_000001,1.0194733184012872,1.0194733184012872,best_rank_path
+md,lower_better,Średnie odchylenie od zaplanowanych milestone'ów.,3351,3351,0,1140,False,path_001786,0.0,0.0,best_rank_path
+bp,lower_better,Nieważona równomierność zmian w etapach; karze nierówny rozkład całkowitej zmiany danego czynnika.,3351,3351,0,1,False,path_002223,0.0084211834937441,0.0084211834937441,best_rank_path
+wbp,lower_better,Równomierność zmian z wagami czynników.,3351,3351,0,1,False,path_002223,0.0084211834937441,0.0084211834937441,best_rank_path
+sbp,lower_better,Równomierność zmian z wagami etapów.,3351,3351,0,1,False,path_002223,0.0084211834937441,0.0084211834937441,best_rank_path
+swbp,lower_better,Równomierność zmian z wagami czynników i etapów jednocześnie.,3351,3351,0,1,False,path_002223,0.0084211834937441,0.0084211834937441,best_rank_path
+mcp,lower_better,Największy udział jednego etapu w całkowitej zmianie dowolnego czynnika.,3351,3351,0,1,False,path_002223,0.4513331075632187,0.4513331075632187,best_rank_path
+pyv,lower_better,Zmienność postępu uzyskanego z jednostki wysiłku w kolejnych etapach.,3351,3351,0,1,False,path_002828,0.2221724574556429,0.2221724574556429,best_rank_path
+pym,higher_better,Najgorszy etapowy postęp na jednostkę wysiłku.,3351,3351,0,1,False,path_001201,31.32114756608998,31.32114756608998,best_rank_path
+apw,lower_better,Średnia szerokość przedziału robustności na ścieżce.,3351,3351,0,1,False,path_002867,8.75,8.75,best_rank_path
+fw,lower_better,Końcowa szerokość przedziału robustności.,3351,3351,0,1,False,path_000675,3.0,3.0,best_rank_path
+ww,lower_better,Ważona szerokość robustności na ścieżce.,3351,3351,0,1,False,path_002867,8.75,8.75,best_rank_path
+pc,lower_better,Średnia odległość Jaccarda prawdziwych zbiorów peer/reference między kolejnymi etapami.,3351,3351,0,3128,False,path_000001,0.0,0.0,best_rank_path
+rc,lower_better,Pomocnicza nieciągłość zbiorów relacji necessary/possible między etapami.,3351,3351,0,1332,False,path_000001,0.0,0.0,best_rank_path
+opp,lower_better,Odległość L1 między strukturą input/output w etapach a strukturą początkową.,3351,3351,0,1,False,path_000435,0.0530107991401252,0.0530107991401252,best_rank_path
+rr,higher_better,"Udział etapów po starcie, które odpowiadają realnym obserwowanym jednostkom.",3351,3351,0,3351,True,path_000001,0.0,0.0,best_rank_path
+tc,lower_better,"Całkowity znormalizowany wysiłek ścieżki, czyli suma ważonych zmian między kolejnymi punktami wszystkich etapów.",3349,3349,0,2,False,path_000001,0.2712256173854957,0.2712256173854957,best_efficiency_path
+msc,lower_better,Największy wysiłek pojedynczego etapu; pokazuje najtrudniejszy krok.,3349,3349,0,1,False,path_000376,0.1120388226464829,0.1120388226464829,best_efficiency_path
+cdir,lower_better,Najmniejszy znormalizowany wysiłek bezpośredni do celu znaleziony w ocenionej puli końcowej.,3349,3349,0,3349,True,path_000001,0.2660448414783675,0.2660448414783675,best_efficiency_path
+cdir_endpoint,lower_better,Znormalizowany wysiłek bezpośredni od startu do końca konkretnej ścieżki.,3349,3349,0,2,False,path_000001,0.2712256173854957,0.2712256173854957,best_efficiency_path
+dr,lower_better,Relatywny objazd ścieżki etapowej względem ruchu bezpośredniego.,3349,3349,0,2,False,path_000001,1.0194733184012872,1.0194733184012872,best_efficiency_path
+md,lower_better,Średnie odchylenie od zaplanowanych milestone'ów.,3349,3349,0,15,False,path_000784,0.0176444264999999,0.0176444264999999,best_efficiency_path
+bp,lower_better,Nieważona równomierność zmian w etapach; karze nierówny rozkład całkowitej zmiany danego czynnika.,3349,3349,0,1,False,path_001085,0.0039051056632783,0.0039051056632783,best_efficiency_path
+wbp,lower_better,Równomierność zmian z wagami czynników.,3349,3349,0,1,False,path_001085,0.0039051056632783,0.0039051056632783,best_efficiency_path
+sbp,lower_better,Równomierność zmian z wagami etapów.,3349,3349,0,1,False,path_001085,0.0039051056632783,0.0039051056632783,best_efficiency_path
+swbp,lower_better,Równomierność zmian z wagami czynników i etapów jednocześnie.,3349,3349,0,1,False,path_001085,0.0039051056632783,0.0039051056632783,best_efficiency_path
+mcp,lower_better,Największy udział jednego etapu w całkowitej zmianie dowolnego czynnika.,3349,3349,0,2,False,path_001093,0.4218512428287816,0.4218512428287816,best_efficiency_path
+pyv,lower_better,Zmienność postępu uzyskanego z jednostki wysiłku w kolejnych etapach.,3349,3349,0,1,False,path_000603,0.0001003503976691,0.0001003503976691,best_efficiency_path
+pym,higher_better,Najgorszy etapowy postęp na jednostkę wysiłku.,3349,3349,0,1,False,path_000226,0.8898665687616152,0.8898665687616152,best_efficiency_path
+apw,lower_better,Średnia szerokość przedziału robustności na ścieżce.,3349,3349,0,1,False,path_003348,0.328042287875,0.328042287875,best_efficiency_path
+fw,lower_better,Końcowa szerokość przedziału robustności.,3349,3349,0,1,False,path_000573,0.1247745002,0.1247745002,best_efficiency_path
+ww,lower_better,Ważona szerokość robustności na ścieżce.,3349,3349,0,1,False,path_003348,0.328042287875,0.328042287875,best_efficiency_path
+pc,lower_better,Średnia odległość Jaccarda prawdziwych zbiorów peer/reference między kolejnymi etapami.,3349,3349,0,1652,False,path_000001,0.0,0.0,best_efficiency_path
+rc,lower_better,Pomocnicza nieciągłość zbiorów relacji necessary/possible między etapami.,3349,3349,0,229,False,path_000001,0.0,0.0,best_efficiency_path
+opp,lower_better,Odległość L1 między strukturą input/output w etapach a strukturą początkową.,3349,3349,0,1,False,path_001294,0.0288047018335645,0.0288047018335645,best_efficiency_path
+rr,higher_better,"Udział etapów po starcie, które odpowiadają realnym obserwowanym jednostkom.",3349,3349,0,3349,True,path_000001,0.0,0.0,best_efficiency_path
+tc,lower_better,"Całkowity znormalizowany wysiłek ścieżki, czyli suma ważonych zmian między kolejnymi punktami wszystkich etapów.",1275,1275,0,85,False,path_000826,0.6456964350658327,0.6456964350658327,robustness_width_path
+msc,lower_better,Największy wysiłek pojedynczego etapu; pokazuje najtrudniejszy krok.,1275,1275,0,1,False,path_000826,0.2911367454123474,0.2911367454123474,robustness_width_path
+cdir,lower_better,Najmniejszy znormalizowany wysiłek bezpośredni do celu znaleziony w ocenionej puli końcowej.,1275,1275,0,1275,True,path_000826,0.6456964350658329,0.6456964350658329,robustness_width_path
+cdir_endpoint,lower_better,Znormalizowany wysiłek bezpośredni od startu do końca konkretnej ścieżki.,1275,1275,0,85,False,path_000826,0.6456964350658329,0.6456964350658329,robustness_width_path
+dr,lower_better,Relatywny objazd ścieżki etapowej względem ruchu bezpośredniego.,1275,1275,0,85,False,path_000826,0.9999999999999998,0.9999999999999998,robustness_width_path
+md,lower_better,Średnie odchylenie od zaplanowanych milestone'ów.,1275,1275,0,1,False,path_000638,0.0011576875666666,0.0011576875666666,robustness_width_path
+bp,lower_better,Nieważona równomierność zmian w etapach; karze nierówny rozkład całkowitej zmiany danego czynnika.,1275,1275,0,1,False,path_001261,0.0446010616498605,0.0446010616498605,robustness_width_path
+wbp,lower_better,Równomierność zmian z wagami czynników.,1275,1275,0,1,False,path_001261,0.0446010616498605,0.0446010616498605,robustness_width_path
+sbp,lower_better,Równomierność zmian z wagami etapów.,1275,1275,0,1,False,path_001261,0.0446010616498605,0.0446010616498605,robustness_width_path
+swbp,lower_better,Równomierność zmian z wagami czynników i etapów jednocześnie.,1275,1275,0,1,False,path_001261,0.0446010616498605,0.0446010616498605,robustness_width_path
+mcp,lower_better,Największy udział jednego etapu w całkowitej zmianie dowolnego czynnika.,1275,1275,0,1,False,path_001261,0.7053014884123876,0.7053014884123876,robustness_width_path
+pyv,lower_better,Zmienność postępu uzyskanego z jednostki wysiłku w kolejnych etapach.,1275,1275,0,1,False,path_000645,0.0081720951893847,0.0081720951893847,robustness_width_path
+pym,higher_better,Najgorszy etapowy postęp na jednostkę wysiłku.,1275,1275,0,60,False,path_000736,0.2484101921933232,0.2484101921933232,robustness_width_path
+apw,lower_better,Średnia szerokość przedziału robustności na ścieżce.,1275,1275,0,1,False,path_001211,0.1941893811,0.1941893811,robustness_width_path
+fw,lower_better,Końcowa szerokość przedziału robustności.,1275,1275,0,85,False,path_000836,0.0807584972,0.0807584972,robustness_width_path
+ww,lower_better,Ważona szerokość robustności na ścieżce.,1275,1275,0,1,False,path_001211,0.1941893811,0.1941893811,robustness_width_path
+pc,lower_better,Średnia odległość Jaccarda prawdziwych zbiorów peer/reference między kolejnymi etapami.,1275,1275,0,469,False,path_001261,0.0,0.0,robustness_width_path
+rc,lower_better,Pomocnicza nieciągłość zbiorów relacji necessary/possible między etapami.,1275,1275,0,158,False,path_000796,0.3055555555555554,0.3055555555555554,robustness_width_path
+opp,lower_better,Odległość L1 między strukturą input/output w etapach a strukturą początkową.,1275,1275,0,1,False,path_001049,0.4861322996367243,0.4861322996367243,robustness_width_path
+rr,higher_better,"Udział etapów po starcie, które odpowiadają realnym obserwowanym jednostkom.",1275,1275,0,1275,True,path_000826,0.0,0.0,robustness_width_path

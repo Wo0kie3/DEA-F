@@ -228,7 +228,7 @@ def _parse_ref_set(value) -> set[str] | None:
     if value is None or pd.isna(value):
         return None
     text = str(value).strip()
-    if not text:
+    if not text or text == "[]":
         return set()
     return {part for part in text.split("|") if part}
 
@@ -666,7 +666,7 @@ def _add_set_continuity_metrics(
             similarity = 1.0 if not union else len(previous & current) / len(union)
             similarities.append(similarity)
 
-        if not similarities:
+        if not similarities or len(similarities) != len(stage_indices) - 1:
             continue
 
         continuity = 1.0 - (sum(similarities) / len(similarities))

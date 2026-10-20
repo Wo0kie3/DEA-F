@@ -132,7 +132,7 @@ Write-Host "Mode: $Mode"
 Write-Host "Output: $experimentDir"
 
 Invoke-PathPipeline -ScriptName "1_hasse_path_pipeline.py"
-Invoke-PathPipeline -ScriptName "2_front_path_pipeline.py"
+Invoke-PathPipeline -ScriptName "2_necessary_layer_path_pipeline.py"
 
 $rankArgs = @(
     "--target-best-rank", $TargetBestRank,

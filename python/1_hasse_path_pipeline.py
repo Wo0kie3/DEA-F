@@ -1,4 +1,6 @@
 import argparse
+from joint_final_goal import filter_joint_final, initialize_joint_goal, write_joint_hasse
+from shared_candidate_pool import prepare_fictive_metrics
 from pathlib import Path
 
 import pandas as pd
@@ -44,6 +46,8 @@ from path_pipeline_common import (
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", required=True)
+    parser.add_argument("--final-goal", choices=["method-specific", "joint"], default="method-specific")
+    parser.add_argument("--shared-pool", help="Validated comparison directory with evaluated_candidates.csv")
     parser.add_argument("--target", required=True)
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--java-entry", required=True)
@@ -82,6 +86,7 @@ def parse_args():
 def main():
     args = parse_args()
     run_dir = create_run_output_dir(args.output_dir, "hasse_path")
+    joint_targets = initialize_joint_goal(args, run_dir)
 
     df_input = pd.read_csv(args.input)
     if "name" not in df_input.columns:
@@ -227,30 +232,7 @@ def main():
         write_publication_selection(path_metrics, run_dir, method_name="hasse_path")
         return
 
-    candidates = generate_attainable_fictive_candidates(
-        df=df_input,
-        target_row=target_row,
-        columns_to_modify=columns_to_modify,
-        pct_above=args.pct_above,
-        step_pct=args.step_pct,
-        step_abs=args.step_abs,
-        min_points_per_dim=args.min_points_per_dim,
-        max_candidates=args.max_candidates,
-        name_prefix=args.target,
-    )
-    candidates_csv = run_dir / "fictive_candidates.csv"
-    candidates.to_csv(candidates_csv, index=False)
-
-    candidate_metrics_csv = run_dir / "fictive_candidate_metrics.csv"
-    export_candidate_robust_metrics_with_java(
-        reference_csv=path_for_java(args.input, args.java_entry),
-        candidates_csv=path_for_java(str(candidates_csv), args.java_entry),
-        output_csv=path_for_java(str(candidate_metrics_csv), args.java_entry),
-        java_entry=args.java_entry,
-        main_class=args.candidate_metrics_main_class,
-        maven_executable=args.maven_executable,
-    )
-    fictive_metrics = pd.read_csv(candidate_metrics_csv)
+    fictive_metrics = prepare_fictive_metrics(args, df_input, target_row, columns_to_modify, run_dir)
     fictive_metrics = add_effort_columns(
         fictive_metrics,
         target_row,
@@ -261,6 +243,10 @@ def main():
     fictive_metrics.to_csv(run_dir / "fictive_hasse_metrics.csv", index=False)
 
     start_state = real_states[real_states["name"] == args.target].iloc[0].copy()
+    if joint_targets is not None:
+        write_joint_hasse(args, run_dir, start_state, fictive_metrics, inputs, outputs,
+            columns_to_modify, normalization_ranges, factor_weights, max_factor_changes)
+        return
 
     all_stage_candidates = []
     all_state_paths = []

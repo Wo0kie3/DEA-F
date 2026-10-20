@@ -1070,5 +1070,8 @@ def state_paths_to_frame(paths: list[list[pd.Series]], io_cols: list[str]) -> pd
             for col in io_cols:
                 if col in state:
                     row[f"{prefix}_{col}"] = state[col]
+            for col in state.index:
+                if str(col).startswith("milestone_"):
+                    row[f"{prefix}_{col}"] = state[col]
         rows.append(row)
     return pd.DataFrame(rows)

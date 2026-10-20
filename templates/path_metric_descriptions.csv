@@ -15,7 +15,7 @@ pym,Postęp,higher_better,"Najgorszy etapowy postęp na jednostkę wysiłku.",PY
 apw,Robustność,lower_better,"Średnia szerokość przedziału robustności na ścieżce.",APW(pi),"Kolumna ogólna używa score_width albo rank_width zgodnie z metodą."
 fw,Robustność,lower_better,"Końcowa szerokość przedziału robustności.",FW(pi),"Mierzy stabilność końcowej rekomendacji."
 ww,Robustność,lower_better,"Ważona szerokość robustności na ścieżce.",WW(pi),"Wagi są równe domyślnie albo jawne przez --width-state-weights."
-pc,Ciągłość benchmarków,lower_better,"Nieciągłość prawdziwych zbiorów peer/reference między kolejnymi etapami.",PC(pi),"Pozostaje puste, jeżeli adapter nie dostarcza peer sets."
+pc,Ciągłość benchmarków,lower_better,"Średnia odległość Jaccarda prawdziwych zbiorów peer/reference między kolejnymi etapami.",PC(pi),"Konwencja eksperymentu: wszystkie możliwe peery w radialnie optymalnych rozwiązaniach input-oriented CCR na stałym zbiorze oryginalnych DMU; max lambda > 1e-7; bez fazy slacków. Wymaga zbiorów dla wszystkich stanów."
 rc,Ciągłość relacji,lower_better,"Pomocnicza nieciągłość zbiorów relacji necessary/possible między etapami.",-,"Nie jest miarą PC z paperu."
 opp,Profil operacyjny,lower_better,"Odległość L1 między strukturą input/output w etapach a strukturą początkową.",OPP(pi),"Mała wartość oznacza, że jednostka zachowuje podobny profil działalności."
 rr,Rzeczywistość ścieżki,higher_better,"Udział etapów po starcie, które odpowiadają realnym obserwowanym jednostkom.",RR(pi),"1 oznacza, że wszystkie etapy po starcie są realne; 0 oznacza same punkty fictive."

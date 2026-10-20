@@ -1,5 +1,105 @@
 # Standard outputu eksperymentu i wizualizacji 2D
 
+## Porównanie dwóch celów POS na grafie NEC
+
+### Wybor metryki w raporcie pieciu metod
+
+Kazda metoda ma selektor 20 pozycji katalogu. Zmieniaj razem sciezke, fronty
+etapow od faktycznego poprzednika, tabele stanow oraz 20 wynikow z rachunkami.
+Kierunki: katalog `direction`; PYM i RR maksymalizowane, pozostale minimalizowane.
+Wyklucz NaN/inf, podaj liczbe wykluczonych wynikow. Przy remisie w tolerancji 1e-9
+wybierz TC, potem MSC, potem stabilne ID; pokaz tie_count i stale metryki.
+Eksportuj selection/ties/transition_audit z prefiksem `metric_explorer_` przy runie,
+a wspolne zestawienie wyborow w katalogu eksperymentu. Wszystkie rownorzedne ID
+sa w CSV, panel pokazuje jednego reprezentanta. Zestawienie/wykres porownawczy
+na gorze raportu zachowuje podpisany wybor leksykograficzny. Nie nazywaj skonczonej
+puli po przycinaniu i limitach wszystkimi mozliwymi sciezkami problemu ciaglego.
+
+Aktualny wspolny cel dla pieciu metod: uruchom `run_shared_pool_methods.py`
+z `--final-goal joint --pool <porownanie> --output-root <nowy-katalog>`.
+Raport `five_method_report.html` pokazuje piec metod, wszystkie z joint na koncu.
+Hasse ma POS na etapach posrednich. Metoda 2 to nadal warstwy NEC, nie fronty
+efektywnosci. Dla metod 3-5 joint nie zastepuje koncowego milestone'u, lecz jest
+dodatkowym warunkiem. Nie porownuj Cdir ze starymi pulami bez joint. Audyt
+`common_weight_final_goal` sprawdza kazdy zapisany koniec; `final_goal.json`
+wskazuje cele oraz katalog swiadectw. Brak sciezki pozostaw jako jawny wynik.
+
+Pelny raport siedmiu wariantow: po porownaniu POS uruchom
+`python python/run_shared_pool_methods.py --pool output/NAZWA_POROWNANIA`.
+Pieciu historycznych metod nie przedstawiaj jako poprawionych celow POS.
+Wszystkie metody wykorzystuja jedna pule Java i osobno buduja sciezki.
+Nie dodawaj method-specific refinementu do tej kontrolowanej wersji.
+Przy `--grid-levels 9 --jitter-samples 4 --jitter-fraction 0.6` pula ma 3645 punktow.
+Zestawienie zachowuje dane DEA, NEC/POS, peeling, diagram Hassego, metryki,
+okienka rachunkow, etapy, pochodzenie punktow i audyt minimalnosci.
+
+Gesty wariant: dodaj `--grid-levels 9 --jitter-samples 2 --jitter-fraction 0.2
+--sampling-seed 20261019` do polecenia porownania. Dla obecnego EDU: 2187 punktow
+(729 siatki + 1458 prob w lokalnych pudelkach). Obie wersje uzywaja identycznej
+puli, wszystkie punkty przechodza ocene Java po maksymalnie 500 stanow w partii.
+`candidate_sampling.csv` zapisuje centra i pochodzenie, `experiment_params.csv`
+parametry losowania. Szum nie zmienia scores ani danych referencyjnych.
+
+Uruchom `compare_hasse_pos_variants.py --source <zapisany_eksperyment> --output <nowy_katalog>`.
+Ten workflow porównuje `pairwise` i `joint`, a nie pięć dawnych metod. Nie używa
+warstw NEC. Ścieżki wynikają z grafu Hassego; pośredni cel jest pojedynczą DMU
+osiąganą przez POS, a wspólny koniec obejmuje wszystkie maksymalne klasy NEC.
+Zachowaj oryginalne dane, siatkę, zakresy, wagi i limity między wariantami.
+
+Raport `hasse_pos_comparison.html` pokazuje snapshot wejścia przed ścieżkami,
+kolorem rozróżnia punkty spełniające tylko POS parami od spełniających wspólne wagi,
+zawiera porównanie wybranych ścieżek, etapowe fronty względem poprzednika i wszystkie
+metryki. Okienka liczą rachunki z nowych wyników, nie z dawnego eksperymentu NEC.
+Tabele wag pokazują osobne świadectwa dla kolejnych celów oraz jeden wspólny wektor
+i ilorazy przy nim. `joint_top=false` oznacza, że wyeksportowane wagi optymalne nie
+są świadectwem spełnienia celu. Zera kosztu ujawniaj, nie usuwaj ich dla estetyki.
+
+Pule rozdzielaj przez `milestone_route_id`, `milestone_target_name` i
+`milestone_goal_kind`, nie tylko numer etapu. Końce różnych gałęzi mają identyczny
+zbiór celów. Pełne wyniki zachowaj w nowych katalogach `pairwise/` i `joint/`,
+z `source_manifest.csv`, `graph_routes.json`, `top_targets.csv`, `possible_goals.csv`,
+`possible_goals.csv.witnesses.csv`, `joint_weight_audit.csv`, `variant_summary.csv`
+i `validation_checks.csv`. Nie utożsamiaj obu kwantyfikatorów ani wyniku z globalną
+minimalnością w przestrzeni ciągłej. Wspólny LP dotyczy dodatnich danych i
+nieograniczonych nieujemnych wag CCR; nie dowodzi silnej efektywności Pareto.
+
+## Wariant EDU: trzy inputy, pięć metod
+
+Dla `input/EDU.csv` używamy pełnego modelu `i1,i2,i3,o1`. Wszystkie inputy mogą maleć,
+a output wybranej DMU pozostaje stały. Przykład:
+
+```powershell
+python python/run_five_method_experiment.py --input input/EDU.csv --root output/edu_five_methods_NEW --target DMU_03 --columns i1,i2,i3 --step-pct 25 --local-samples 64 --global-samples 216 --target-width 0.15 --max-paths 20000
+```
+
+Runner tworzy snapshot i uruchamia metody kolejno. Zapisuje hash wejścia, parametry,
+pełne listy argumentów oraz czas każdego kroku. Generator `generate_five_method_report.py`
+tworzy `five_method_report.html` i `README_results.md`. HTML zawiera wszystkie dane
+i Plotly, działa offline i pokazuje wejście DEA przed wynikami pięciu testów.
+
+- Siatka bazowa: 5 x 5 x 5 = 125 punktów; wspólna dla pięciu metod.
+- Metody 3–5: 4 iteracje refinementu, maksymalnie 6 centrów na etap, 64 próbki lokalne
+  na centrum, ziarno bazowe 42 (pipeline dodaje indeks etapu).
+- Metoda 4 dodatkowo: 216 globalnych próbek z ziarnem 142.
+- Numeryczne cele: najlepsza ranga 1, najlepsza efektywność 0.95, score width 0.15;
+  każdy z trzech numerycznych generatorów ma 3 etapy. Długość metod NEC wynika z grafu.
+- Koszty: równe wagi trzech inputów, zakresy z pełnego EDU. Limit 15 punktów na
+  przejście i 20000 kompletnych ścieżek; osiągnięcie limitu ścieżek ujawnia walidacja.
+- Wspólne osie 3D używają `aspectmode=data`. Rzuty 2D nie służą do oceny dominacji:
+  niezdominowanie jest sprawdzane we wszystkich zmienianych inputach.
+- Każdy etap pokazuje własne próby, front i rzeczywistego poprzednika. Warstwy punktów
+  można włączać i wyłączać z legendy, a hover zawiera scores, rangi oraz źródło/iterację.
+- Front Hassego jest odtwarzany wyłącznie dla zapisanego `milestone_component_id`.
+  Stare `paths.csv` bez metadanych celu nie są wystarczające do tego audytu.
+- Rozróżniaj liczbę rekordów ścieżek od liczby różnych sekwencji nazw stanów.
+  Różne cele strukturalne mogą dawać identyczną sekwencję punktów; osobno pokazuj
+  reprezentantów równoważnych wektorów metryk na froncie Pareto ścieżek.
+
+Kontrole: `validation_checks.csv` dla wszystkich ścieżek i
+`selected_transition_audit.csv` dla etapów pięciu wybranych ścieżek. Nie nazywaj
+warstw NEC frontami efektywności. Nie przedstawiaj porównania jako eksperymentu
+na identycznych końcowych pulach: dodatkowe próbkowanie jest zależne od metody.
+
 Ten dokument opisuje sposób przygotowania porównywalnego eksperymentu DEA-F oraz jednego, samowystarczalnego pliku HTML z interaktywnym wykresem i krótką tabelą ścieżki. Referencyjny przykład korzysta z robotów `Robot_12`, `Robot_18`, `Robot_09`, `Robot_17` i `Robot_06` z Table 1 artykułu Baker i Talluri (1997).
 
 Do porównania **wszystkich pięciu metod** na jednej jednostce służy osobny, kontrolowany runner:
@@ -267,7 +367,7 @@ Generator przed zapisaniem pliku sprawdza dla każdej wybranej ścieżki:
 
 `minimality_certificate.csv` zapisuje również wszystkie kolumny outputów obecne w ścieżce, a raport Markdown wymienia ich wartości początkowe i potwierdza, czy pozostały stałe na każdym etapie.
 
-Interaktywny wykres pokazuje dla wybranego etapu wszystkie faktycznie ocenione punkty z siatki bazowej, próbkowania globalnego, iteracji refinementu, końcowej granicy refinementu i przeszukiwania lokalnego. Hover podaje `best_efficiency`, `worst_efficiency`, `score_width`, przedział rang, źródło punktu i przynależność do puli selekcyjnej. Punkty są rozdzielone na: poniżej progu, próby diagnostyczne poza pulą selekcyjną, nieosiągalne z poprzednika, zdominowane oraz front Pareto konkretnego przejścia. Kolor punktu koduje `best_efficiency` w stałej skali `0–1`.
+Interaktywny wykres pokazuje dla wybranego etapu wszystkie faktycznie ocenione punkty z siatki bazowej, próbkowania globalnego, iteracji refinementu, końcowej granicy refinementu i przeszukiwania lokalnego. Hover podaje `best_efficiency`, `worst_efficiency`, `score_width`, przedział rang, źródło punktu i przynależność do puli selekcyjnej. Punkty są rozdzielone na: poniżej progu, próby diagnostyczne poza pulą selekcyjną, nieosiągalne z poprzednika, zdominowane oraz front Pareto konkretnego przejścia. W raporcie pieciu metod wszystkie kategorie wybranego etapu i oryginalne DMU sa domyslnie widoczne. Kolory sa normalizowane do `0–1` wedlug minimum i maksimum E* bazowej ocenionej puli danej metody, stale dla etapow i metryk wyboru. Legenda oraz hover zachowuja rzeczywiste E*. Normalizacja jest wylacznie prezentacyjna i nie zmienia zadnej metryki ani selekcji sciezek.
 
 Dla wymiarów o różnych rzędach wielkości można użyć `--normalize-display`. Wtedy każda oś pokazuje liniowo przeskalowany poziom redukcji: `0%` odpowiada wartości startowej targetu, a `100%` najmniejszej wartości faktycznie ocenionej w danym inpucie. Jest to wyłącznie transformacja prezentacyjna; oryginalne wartości pozostają w hoverze i tabeli, a monotoniczne skalowanie nie zmienia osiągalności, dominacji ani składu frontu Pareto. Parametr i semantykę skali zapisz w `experiment_params.csv`.
 
@@ -330,6 +430,44 @@ Kolor nie może być jedynym nośnikiem informacji. Etapy różnią się także 
 - frontu policzonego globalnie względem punktu startowego.
 
 Pełna chmura kandydatów jest przydatna diagnostycznie. Do takiej analizy użyj `python/visualize_minimality_2d.py`, ale nie traktuj wykresu diagnostycznego jako końcowej figury prezentacyjnej.
+
+## Pełne metryki w raporcie pięciu metod
+
+Runner `run_five_method_experiment.py` automatycznie uzupełnia PC przez
+`complete_experiment_metrics.py`, a następnie generuje raport. Dla istniejącego
+eksperymentu uruchom ten etap przed ponownym `generate_five_method_report.py`.
+Nie trzeba ponownie generować ani oceniać kandydatów robust DEA.
+
+Raport ma pokazać 20 wierszy katalogu (w tym pomocnicze Cdir_endpoint i RC),
+opisy przed wynikami oraz po jednej kolumnie dla wybranej ścieżki każdej metody.
+CSV: `selected_path_all_metrics.csv`.
+W pełnej tabeli każdy wynik udostępnia okienko z rachunkiem po najechaniu lub
+uzyskaniu fokusu przez Tab. Kliknięcie przypina okienko, Esc, przycisk zamknięcia
+lub kliknięcie poza nim zamyka je. Pokazuj wzór, podstawione wartości etapów,
+zakresy i wagi oraz wynik przed zaokrągleniem tabeli. Dla Cdir pokaż właściwą pulę
+i punkt osiągający minimum; nie zastępuj go końcem wybranej ścieżki.
+`metric_calculation_details.json` zachowuje te same rachunki. Generator sprawdza
+ich zgodność z CSV i przerywa generowanie przy rozbieżności. Nie przeliczaj DEA
+ani ścieżek tylko w celu dodania okienek. Skrypt i style są osadzone w HTML.
+
+Rozwijana tabela każdej ścieżki zachowuje
+także szczegółowe warianty PYV/PYM dla czterech wskaźników oraz szerokości score/rank.
+`metric_coverage.csv` obejmuje wszystkie ścieżki, nie tylko pięć wybranych.
+`metric_exceptions.csv` odróżnia brak danych od matematycznej nieokreśloności:
+zerowy koszt kroku oznacza niezdefiniowane PYV/PYM, zerowe Cdir oznacza niezdefiniowane DR.
+Nigdy nie zastępuj tych wartości zerem.
+
+Przyjęta konwencja PC: input-oriented CCR na stałych oryginalnych DMU,
+minimalizacja theta, a następnie przy theta=theta* osobna maksymalizacja każdej lambda_j.
+P(z) zawiera wszystkie DMU z max lambda_j > 1e-7. Nie stosujemy drugiej fazy slacków;
+adapter wymaga dodatnich danych. `peer_theta` może przekroczyć 1, nie jest robust score.
+Tabela etapów zawiera `peer_refs`, `peer_theta`, `peer_jaccard_distance`.
+PC jest średnią odległości Jaccarda wszystkich kolejnych par. RC to osobna miara
+zbiorów relacji, również liczona od startu; nie zastępuje peerów.
+`peer_evaluation_results.csv` zawiera także maksymalne lambda, a
+`metric_completion.json` konwencję, tolerancje, hash wejścia i czas przeliczenia.
+Brakującego zbioru nie utożsamiaj ze znanym pustym zbiorem `[]`.
+Nie zmieniaj wybranych ścieżek tylko po to, żeby usunąć wyjątki metryk.
 
 ## 9. Krótka tabela pod wykresem
 

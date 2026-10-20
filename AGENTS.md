@@ -11,16 +11,24 @@ Python odpowiada za generowanie kandydatów, składanie ścieżek, metryki, rapo
 ## Aktywna architektura
 
 - `python/1_hasse_path_pipeline.py` — metoda necessary/Hasse.
-- `python/2_front_path_pipeline.py` — historycznie nazwana metoda kolejnych warstw rankingu necessary; obecnie nie implementuje peelingu frontów efektywności.
+- `python/compare_hasse_pos_variants.py`, `python/hasse_pos_goals.py` i `python/generate_hasse_pos_report.py` — jawne porównanie dwóch nowych celów POS na ścieżkach grafu NEC. Używa siatki zapisanego eksperymentu fictive, ponownie ocenia kandydatów w Javie, zapisuje osobne wyniki i raport; nie używa warstw NEC jako ścieżek.
+- `java/src/main/java/org/example/CsvPossibleGoalsExporter.java` — POS parami z biblioteki oraz wspólny LP dla wszystkich celów końcowych, z eksportem wag i audytem.
+- `python/2_necessary_layer_path_pipeline.py` — metoda kolejnych warstw rankingu necessary; obecnie nie implementuje peelingu frontów efektywności.
 - `python/3_best_rank_path_pipeline.py` — kamienie milowe najlepszej rangi.
 - `python/4_best_efficiency_path_pipeline.py` — kamienie milowe najlepszej efektywności.
 - `python/5_robustness_width_path_pipeline.py` — redukcja szerokości score albo rank.
 - `python/path_pipeline_common.py` — wspólna logika siatki, osiągalności, selekcji przejść i enumeracji ścieżek.
 - `python/candidate_refinement.py` — refinement, globalne próbkowanie i lokalne przeszukiwanie.
 - `python/path_metrics.py` — metryki całych ścieżek.
+- `python/complete_experiment_metrics.py` — uzupełnia zapisane ścieżki pięciu metod o rzeczywiste peer sets i przelicza metryki bez ponownego searchu; zachowuje Cdir, wagi i wybrane ID.
+- `java/src/main/java/org/example/CsvPeerSetsExporter.java` — input-oriented CCR na stałym zbiorze referencyjnym, suma peer sets wszystkich radialnie optymalnych rozwiązań (OR-Tools GLOP).
+- `python/metric_reporting.py` — komplet 20 pozycji katalogu oraz jawny status obliczenia każdej metryki.
+- `python/metric_calculation_details.py` i `python/report_assets/metric_calculations.*` — rachunki 20 metryk dla wybranych ścieżek, sprawdzane względem CSV; okienka po najechaniu/fokusie, przypinane kliknięciem. Eksport: `metric_calculation_details.json`. Nie zmieniaj obliczeń ani wyboru ścieżki na potrzeby podpowiedzi.
 - `python/path_selection.py` — wybór pojedynczy, leksykograficzny, Pareto i ważony.
 - `python/validate_controlled_experiment.py` — audyt spójności pięciu runów kontrolowanych.
 - `python/generate_five_method_robot_report.py` — samowystarczalny raport porównawczy przykładu z robotami.
+- `python/run_five_method_experiment.py` — sekwencyjny eksperyment pięciu metod na dwóch lub trzech zmienianych inputach; zapisuje polecenia, czasy, hash danych i parametry.
+- `python/generate_five_method_report.py` — wspólny raport HTML: wejście DEA, NEC/POS, peeling, Hasse, porównanie ścieżek, etapy i audyt frontów; dla trzech inputów zawiera wykresy 3D i rzuty 2D.
 - `python/minimality_certificate.py` — certyfikat minimalności względem przebadanej puli.
 - `python/collect_path_metrics.py` — agregacja wyników metod.
 - `python/generate_dea_input_snapshot.py` — wspólny snapshot wejścia `X/Y`, bazowych metryk robust DEA, iteracyjnych frontów efektywności, macierzy NEC/POS, rankingu necessary i diagramu Hassego.
@@ -93,8 +101,61 @@ Minimalność etapu oznacza brak dominującego punktu w faktycznie ocenionej pul
 
 ## Pięć metod
 
+### Nowe porównanie Hasse/POS
+
+Aktualny wariant pieciu metod: `run_shared_pool_methods.py --final-goal joint
+--pool <oceniona-pula> --output-root <nowy-katalog>`. `joint_final_goal.py`
+wymusza wspolny wektor wag na OSTATNIM etapie wszystkich metod, przed selekcja
+Pareto. Metody 3-5 zachowuja koniunkcje z wlasnym koncowym progiem i licza Cdir
+na przefiltrowanej puli. Hasse przelacza sie na POS po grafie oraz globalny joint
+na koncu. Metoda 2 pozostaje warstwami NEC z dodatkowym joint, nie peelingiem.
+Wektor jest wspolny dla celow koncowych, nie dla calej sciezki. Flaga wymaga
+shared-pool/fictive; bez niej historyczne pipeline'y sa niezmienione. Zapisuj
+final_goal.json, sprawdzaj joint_top kazdego konca oraz swiadectwa w puli.
+Brak sciezki nie uzasadnia rozluznienia celu; puste pliki maja miec naglowki.
+
+`run_shared_pool_methods.py --pool <porownanie>` uruchamia historyczne piec metod
+na tej samej ocenionej puli i rozszerza raport o siedem wynikow. Pipeline'y przyjmuja
+`--shared-pool` przez `shared_candidate_pool.py`; waliduj referencje, target,
+wymiary, osiagalnosc i stale czynniki. Nie dodawaj refinementu/globalnych prob w
+trybie wspolnej puli. Historyczne NEC pozostaja jawnie opisanymi baseline'ami,
+nie poprawionymi wariantami POS. Raport zachowuje semantyke i skale metryk metody.
+
+`pos_candidate_sampling.py` opcjonalnie zageszcza siatke przez `--grid-levels`
+i dodaje `--jitter-samples` prob na centrum. Promien `--jitter-fraction` jest
+ulamkiem nowego kroku osi; losuj w przecieciu pudelka z granicami zrodla, bez
+clippingu wylosowanych wartosci. Zachowaj stale czynniki, oryginalne punkty,
+ziarno `--sampling-seed` i `candidate_sampling.csv`. Wszystkie probki oceniaj
+w Javie i udostepniaj obu wariantom; partie maja najwyzej 500 stanow.
+
+Od 19 października 2026 testujemy oddzielnie `pairwise` i `joint` przez
+`compare_hasse_pos_variants.py`. NEC wyznacza graf i krawędzie Hassego, nie warunek
+osiągnięcia celu. Etap pośredni wymaga POS nad pojedynczą DMU wskazaną na gałęzi.
+Końcowy cel jest wspólny: wszystkie DMU wszystkich maksymalnych klas SCC grafu NEC,
+także szczyty nieosiągalne z wybranego startu w samym grafie. Nie usuwaj klasy
+maksymalnej z powodu wzajemnego NEC jej członków. Końcowy wierzchołek gałęzi zostaje
+zastąpiony wspólnym celem, bez dodatkowego etapu. Dla startu na szczycie wykonaj
+jeden etap wspólnego celu. Gałęzie różniące się wyłącznie końcowym szczytem scalaj.
+
+- `pairwise`: dla każdej końcowej DMU istnieją wagi, które mogą być różne.
+- `joint`: jeden układ wag spełnia wszystkie końcowe porównania. LP maksymalizuje
+  `u*y(z)` przy `v*x(z)=1`, `u*y(z)<=1`, `u*y(t)<=v*x(t)` dla każdego celu, `u,v>=0`.
+  Optimum co najmniej `1-1e-9` oznacza spełnienie celu. Obowiązuje model CCR bez
+  dodatkowych ograniczeń wag oraz ściśle dodatnie dane. Nie zastępuj tego testu
+  koniunkcją flag POS i nie nazywaj go certyfikatem silnej efektywności Pareto.
+
+Oba warianty używają identycznej puli, zakresów, wag i limitów. Koszty i fronty
+pozostają krokowe. POS może być spełnione bez zmiany; nie wymuszaj dodatniego kosztu.
+Raport ma pokazywać zerowe kroki i niezdefiniowane PYV/PYM. Przy różnych długościach
+gałęzi metryki licz osobno dla rzeczywistej liczby etapów, bez końcowych NaN.
+`milestone_route_id`, `milestone_target_name`, `milestone_goal_kind` identyfikują
+dokładną pulę; wizualizacja nie może mieszać gałęzi. Zachowaj świadectwa wag
+`possible_goals.csv.witnesses.csv`, `joint_weight_audit.csv`, `graph_routes.json`,
+`top_targets.csv` i manifest źródła. Historyczny runner pięciu metod nadal używa
+warunków opisanych niżej; nie przepisuj jego starych wyników ani nie opisuj ich jako POS.
+
 1. **Hasse path** — korzysta z klas równoważności relacji necessary i krawędzi pokrycia diagramu Hassego. W trybie fictive/mixed kolejne stany muszą spełniać wymagania odpowiednich klas necessary.
-2. **Necessary-layer path** (`2_front_path_pipeline.py`, nazwa historyczna) — przechodzi po warstwach DAG relacji necessary; opcjonalne `--require-edge-monotonicity` respektuje krawędzie necessary. Nie utożsamiaj tych warstw z frontami efektywności DEA.
+2. **Necessary-layer path** (`2_necessary_layer_path_pipeline.py`) — przechodzi po warstwach DAG relacji necessary; opcjonalne `--require-edge-monotonicity` respektuje krawędzie necessary. Nie utożsamiaj tych warstw z frontami efektywności DEA.
 3. **Best rank path** — na etapie `h` kandydat spełnia `best_rank <= r_h`.
 4. **Best efficiency path** — na etapie `h` kandydat spełnia `best_efficiency >= e_h`.
 5. **Robustness width path** — kandydat spełnia `width <= w_h`; dodatkowo nie może pogorszyć głównego wskaźnika postępu: `best_efficiency` dla score width albo `best_rank` dla rank width.
@@ -120,6 +181,19 @@ Milestone’y metod 3–5 są interpolowane liniowo od wartości startowej do ce
 
 ## Pliki wynikowe
 
+Raport pieciu metod ma osobny panel wyboru jednej z 20 metryk dla kazdej metody
+(`metric_path_explorer.py`, `report_assets/metric_path_explorer.js`). Optymalizuj
+wszystkie skonczone wartosci z `path_metrics.csv`, zgodnie z `direction` katalogu
+(PYM/RR maksymalizowane). Remisy: tolerancja 1e-9, potem TC, MSC i ID. Zapisuj
+`metric_explorer_selection.csv`, wszystkie rownorzedne ID w `metric_explorer_ties.csv`
+oraz audyty frontow reprezentantow w `metric_explorer_transition_audit.csv`.
+Zmiana kryterium aktualizuje caly wykres etapow, tabele i rachunki; podsumowanie
+porownawcze zachowuje jawnie podpisany wybor leksykograficzny. Figury sa osadzone
+jako gzip/base64 i wczytywane lokalnie przez DecompressionStream, bez serwera.
+Niezdefiniowanych/niestabilnych wartosci nie traktuj jako zera. Optimum dotyczy
+zapisanej puli po pruning/limitach, a nie pelnej enumeracji. Nie zmieniaj sciezek
+ani metryk na potrzeby prezentacji. Popupy musza obslugiwac dynamiczne przyciski.
+
 Wspólny katalog eksperymentu powinien zawierać snapshot bazowego wejścia DEA:
 
 - `dea_input_snapshot/decision_data.csv` — dane `X/Y` użyte przez bazowe obliczenia;
@@ -135,6 +209,7 @@ Każdy run dostaje osobny katalog `run_<timestamp>` pod katalogiem metody. Najwa
 - `stage_candidates.csv` — pełne pule spełniające milestone’y;
 - `transition_candidates.csv` — branch-specific, osiągalne i niezdominowane następne kroki;
 - `paths.csv` — kompletne ścieżki wraz z metadanymi etapów;
+- Kolumny `stage_h_milestone_*` w `paths.csv` zachowują cel konkretnej gałęzi. Przy wizualizacji Hassego nie łącz pul różnych `milestone_component_id`; stare wyniki bez identyfikatora wymagają ponownego eksportu z pipeline'u.
 - `path_metrics.csv` — metryki całych ścieżek;
 - `path_selection.csv`, `path_pareto.csv` i `path_pareto_representatives.csv` — audytowalne wybory, pełny front Pareto i reprezentanci równoważnych wektorów metryk;
 - `validation_checks.csv` — kontrole spójności kontrolowanego zestawu pięciu metod;
@@ -151,6 +226,9 @@ Nie opisuj obecnej implementacji jako w pełni zgodnej matematycznie z artykułe
 - Przycinanie do frontu Pareto i limity przejść są heurystyką; mogą usunąć lokalnie droższy krok prowadzący do ścieżki lepszej według innej metryki globalnej.
 - `cdir_endpoint` jest bezpośrednim kosztem start → koniec konkretnej ścieżki. `cdir` jest wspólnym minimum względem ocenionej końcowej puli milestone'u (metody 3–5) albo końców kompletnych ścieżek (metody 1–2), a `cdir_scope` zapisuje zakres. Nadal nie jest to analityczne minimum po całej ciągłej przestrzeni, więc `DR = TC / cdir` jest aproksymacją definicji z artykułu.
 - `PC` licz tylko z rzeczywistych zbiorów peer/reference. List necessary/possible nie nazywaj peer sets; ich pomocnicza miara ciągłości jest zapisywana jako `RC`.
+- Przyjęta konwencja PC: minimalizuj theta w input-oriented CCR na oryginalnych DMU, ustal theta=theta*, maksymalizuj każdą lambda_j osobno i zalicz peer, jeśli max lambda_j > 1e-7. Nie wykonuj drugiej fazy slacków. Jest to numeryczne wyznaczenie sumy radialnie optymalnych zbiorów, a nie arbitralny pojedynczy optimum. `peer_theta` może przekroczyć 1 i nie zastępuje robust score. Adapter wymaga ściśle dodatnich skończonych inputów/outputów.
+- PC i RC wymagają zbiorów dla wszystkich przejść, łącznie ze startem. Brak danych nie może skracać mianownika. Znany pusty zbiór zapisuj jako `[]`; pusty CSV/NaN oznacza brak danych. Uzupełnianie bierze relacje startowe z macierzy, włącznie z relacją refleksywną, a kandydatów ze źródłowej puli etapu.
+- Raport pięciu metod pokazuje wszystkie pozycje katalogu, `selected_path_all_metrics.csv`, `metric_coverage.csv` i `metric_exceptions.csv`. PYV/PYM z zerowym kosztem kroku są niezdefiniowane, nigdy zero; opisuj ten przypadek jawnie. Dodatkowy test integracyjny peerów: `DEA_JAVA_TESTS=1` przy uruchamianiu unittest.
 - Ogólne `PYV/PYM` i `APW/FW/WW` muszą odpowiadać semantyce metody, a nie pierwszej dostępnej kolumnie. Metoda rangi używa rangi i rank width; metoda efektywności score i score width; metoda width używa wskazanego rodzaju szerokości oraz odpowiadającego mu wskaźnika postępu.
 - Równe wagi czynników i zakresy z danych obserwowanych są świadomymi założeniami eksperymentalnymi.
 - Remisy metryk porównuj z tolerancją numeryczną; przy wyborze minimalnego `TC` używaj `MSC` jako kolejnego kryterium, zamiast polegać na różnicach float rzędu błędu maszynowego.

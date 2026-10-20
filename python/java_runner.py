@@ -1,9 +1,24 @@
 import subprocess
 
 
+def export_possible_goals_with_java(reference_csv, states_csv, top_targets_csv, output_csv,
+                                    java_entry, maven_executable="mvn"):
+    _run_java_maven(java_entry, maven_executable, "org.example.CsvPossibleGoalsExporter",
+                    [reference_csv, states_csv, top_targets_csv, output_csv])
+
+
+def export_peer_sets_with_java(reference_csv, states_csv, output_csv, java_entry,
+                               maven_executable="mvn"):
+    _run_java_maven(java_entry, maven_executable, "org.example.CsvPeerSetsExporter",
+                    [reference_csv, states_csv, output_csv])
+
+
 def _q(x):
     x = str(x)
-    return f'"{x}"' if (" " in x or "/" in x or "\\" in x) else x
+    # Maven parses the inner quotes; the shell receives one double-quoted property.
+    if "'" in x or '"' in x:
+        raise ValueError("Maven arguments containing quote characters are unsupported")
+    return f"'{x}'" if (any(c.isspace() for c in x) or "/" in x or "\\" in x) else x
 
 
 def _run_java_maven(java_entry, maven_executable, main_class, args_list):

@@ -1,0 +1,16 @@
+{
+  "source_report_sha256": "c517c992b0658f8a8ba0740cfdd281d6bbd2b97110e18e50d88ce6b6f3f35274",
+  "conversion": "Only embedded Plotly 3.3.1 replaced with the same version from CDN; all other scripts unchanged.",
+  "files": {
+    "experiment_params.csv": "c4973f3dfc6539b87d34c910115a9e4f7b8f341110bfc5fe6f2c0c5041f172e9",
+    "five_method_report.html": "c56a787ab19f01484e65d54950e4b5e1a0f343dcb27527d07e2c73c1afe05a62",
+    "metric_coverage.csv": "ea9cc198df159c927104dd989abdb51bb7be95485a3657692e8b345cf066b1e7",
+    "metric_exceptions.csv": "6cfe7a9240014c9eabaa88355b1000da3dab44e162ae44b6478789fd4a3d66e0",
+    "metric_explorer_selection.csv": "67e4df04111398d751fa4591572487d6e2d96fa48e95594e52c380b9898093fc",
+    "python_environment.csv": "f245b49a5abb6e0c02fabf02e61e00db3e622087025cccda952f2857ae8ce34c",
+    "selected_path_all_metrics.csv": "820804cb7d3ccf3413a996f192962bd0b4e8db681ec0eccc32be29eb01c732ed",
+    "selected_path_summary.csv": "a213fc537957b63d262e00a8fcc199415c85a8c9ef860b0586c22377cad5377d",
+    "selected_transition_audit.csv": "b04f93922cc82036ec20b91323e6e9386b6ec67038fa9388b0860c0880f121b0",
+    "validation_checks.csv": "7ee54059d58617f5ebdf049c7634933df74197f95a8a40f97d5760102af434cd"
+  }
+}

@@ -1,0 +1,66 @@
+method,check,passed,details
+hasse_path,nonempty_complete_paths,True,path_count=20000
+hasse_path,common_weight_final_goal,True,"violations=0; targets=['DMU_05', 'DMU_16', 'DMU_20']"
+hasse_path,not_truncated_at_max_paths,False,"path_count=20000, max_paths=20000"
+hasse_path,complete_start_robust_metrics,True,missing=none
+hasse_path,fixed_columns_unchanged,True,violations=0
+hasse_path,actual_predecessor_references,True,violations=0
+hasse_path,tc_equals_step_sum,True,violations=0
+hasse_path,aggregate_stage_budget,True,violations=0
+hasse_path,attainability,True,path_count=20000
+hasse_path,complete_md,True,path_count=20000
+hasse_path,declared_cdir_scope,True,path_count=20000
+hasse_path,declared_path_kind,True,path_count=20000
+hasse_path,publication_selection_outputs,True,run=run_20261019_145324
+front_path,nonempty_complete_paths,True,path_count=20000
+front_path,common_weight_final_goal,True,"violations=0; targets=['DMU_05', 'DMU_16', 'DMU_20']"
+front_path,not_truncated_at_max_paths,False,"path_count=20000, max_paths=20000"
+front_path,complete_start_robust_metrics,True,missing=none
+front_path,fixed_columns_unchanged,True,violations=0
+front_path,actual_predecessor_references,True,violations=0
+front_path,tc_equals_step_sum,True,violations=0
+front_path,aggregate_stage_budget,True,violations=0
+front_path,attainability,True,path_count=20000
+front_path,complete_md,True,path_count=20000
+front_path,declared_cdir_scope,True,path_count=20000
+front_path,declared_path_kind,True,path_count=20000
+front_path,publication_selection_outputs,True,run=run_20261019_145632
+best_rank_path,nonempty_complete_paths,True,path_count=3351
+best_rank_path,common_weight_final_goal,True,"violations=0; targets=['DMU_05', 'DMU_16', 'DMU_20']"
+best_rank_path,not_truncated_at_max_paths,True,"path_count=3351, max_paths=20000"
+best_rank_path,complete_start_robust_metrics,True,missing=none
+best_rank_path,fixed_columns_unchanged,True,violations=0
+best_rank_path,actual_predecessor_references,True,violations=0
+best_rank_path,tc_equals_step_sum,True,violations=0
+best_rank_path,aggregate_stage_budget,True,violations=0
+best_rank_path,attainability,True,path_count=3351
+best_rank_path,complete_md,True,path_count=3351
+best_rank_path,declared_cdir_scope,True,path_count=3351
+best_rank_path,declared_path_kind,True,path_count=3351
+best_rank_path,publication_selection_outputs,True,run=run_20261019_150046
+best_efficiency_path,nonempty_complete_paths,True,path_count=3349
+best_efficiency_path,common_weight_final_goal,True,"violations=0; targets=['DMU_05', 'DMU_16', 'DMU_20']"
+best_efficiency_path,not_truncated_at_max_paths,True,"path_count=3349, max_paths=20000"
+best_efficiency_path,complete_start_robust_metrics,True,missing=none
+best_efficiency_path,fixed_columns_unchanged,True,violations=0
+best_efficiency_path,actual_predecessor_references,True,violations=0
+best_efficiency_path,tc_equals_step_sum,True,violations=0
+best_efficiency_path,aggregate_stage_budget,True,violations=0
+best_efficiency_path,attainability,True,path_count=3349
+best_efficiency_path,complete_md,True,path_count=3349
+best_efficiency_path,declared_cdir_scope,True,path_count=3349
+best_efficiency_path,declared_path_kind,True,path_count=3349
+best_efficiency_path,publication_selection_outputs,True,run=run_20261019_150112
+robustness_width_path,nonempty_complete_paths,True,path_count=1275
+robustness_width_path,common_weight_final_goal,True,"violations=0; targets=['DMU_05', 'DMU_16', 'DMU_20']"
+robustness_width_path,not_truncated_at_max_paths,True,"path_count=1275, max_paths=20000"
+robustness_width_path,complete_start_robust_metrics,True,missing=none
+robustness_width_path,fixed_columns_unchanged,True,violations=0
+robustness_width_path,actual_predecessor_references,True,violations=0
+robustness_width_path,tc_equals_step_sum,True,violations=0
+robustness_width_path,aggregate_stage_budget,True,violations=0
+robustness_width_path,attainability,True,path_count=1275
+robustness_width_path,complete_md,True,path_count=1275
+robustness_width_path,declared_cdir_scope,True,path_count=1275
+robustness_width_path,declared_path_kind,True,path_count=1275
+robustness_width_path,publication_selection_outputs,True,run=run_20261019_150136

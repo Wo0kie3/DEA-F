@@ -1,0 +1,66 @@
+parameter,value
+input,C:\Users\Jurek\Desktop\Doktorat\ROK 2\DEA-F\input\EDU.csv
+root,C:\Users\Jurek\Desktop\Doktorat\ROK 2\DEA-F\output\edu_five_joint_DMU03_20261019
+target,DMU_03
+columns,"i1,i2,i3"
+target_best_rank,1
+target_best_efficiency,0.95
+target_width,0.15
+width_kind,score
+step_pct,25.0
+points_per_transition,15
+max_paths,20000
+local_samples,0
+global_samples,0
+reuse_snapshot,False
+input_sha256,f6fffe83f286c91cd68a3f15ced66d44bfcbac80b155e501484e2f69f2168fba
+mode,fictive
+dimensions,"i1,i2,i3"
+fixed_columns,o1
+stages_numeric_methods,3
+stages_structural_methods,determined by NEC DAG
+factor_weights,"i1=1,i2=1,i3=1"
+pct_above,5
+max_candidates,500
+min_points_per_dim,5
+refine_iterations,0
+refine_max_seeds,6
+local_search_step_multiplier,1.0
+local_search_random_state,42
+local_search_sampling,stratified
+global_search_random_state,142
+max_stage_effort,none
+max_factor_changes,none
+stage_weights,equal
+width_state_weights,equal
+normalization_ranges,"{""i1"": 0.8759999999999999, ""i2"": 1.9029999999999998, ""i3"": 0.458, ""o1"": 0.09499999999999997}"
+publication_selection,lexicographic; min TC also shown
+candidate_pool_note,identical evaluated pool; no extra refinement
+started_at,2026-09-16T00:20:05.251608+02:00
+git_commit,f2549db2b3694e9f80a2d54fd21497ae8f3dde5e
+completed_at,2026-09-16T00:41:34.842250+02:00
+status,success
+peer_convention,"Input-oriented CCR, fixed original reference DMUs, radial phase-I optimum; union of peers with max lambda_j > 1e-7 over all radial optimal solutions; no phase-II slack optimization; peer_theta is not the robust best_efficiency."
+peer_lambda_tolerance,1e-7
+continuity_scope,all transitions including start; PC peers and RC relations separate
+source_experiment,C:\Users\Jurek\Desktop\Doktorat\ROK 2\DEA-F\output\edu_3input_five_methods_DMU03_20260916
+comparison_root,C:\Users\Jurek\Desktop\Doktorat\ROK 2\DEA-F\output\edu_seven_methods_DMU03_20261019
+goal_variants,"pairwise,joint"
+intermediate_goal,POS over one target DMU on a NEC graph route
+final_goal,joint
+top_targets,DMU_05|DMU_16|DMU_20
+candidate_limit,none
+sampling_mode,dense_grid_with_jitter
+grid_levels,9
+jitter_samples,4
+jitter_fraction,0.6
+sampling_seed,20261019
+evaluated_candidate_count,3645
+evaluation_batch_size,500
+joint_tolerance,1e-09
+weight_domain,nonnegative unrestricted CCR weights; positive IO
+snapshot_reused,True
+candidate_robust_metrics_recomputed,True
+started_comparison_at,2026-10-19T08:02:11.343687+00:00
+completed_comparison_at,2026-10-19T08:28:10.498506+00:00
+shared_pool,C:\Users\Jurek\Desktop\Doktorat\ROK 2\DEA-F\output\edu_seven_methods_DMU03_20261019

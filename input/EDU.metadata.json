@@ -1,0 +1,39 @@
+{
+  "dataset": "EDU",
+  "canonical_records_sha256": "1504b60ce635f3a8dcb2dcc3da6f367fb914416ac20c1668cb4a34aa54c2f359",
+  "verified_on": "2026-10-20",
+  "source": {
+    "author": "Javier Fiallos",
+    "year": 2014,
+    "title": "A Model for Performance Evaluation of Emergency Department Physicians",
+    "institution": "University of Ottawa",
+    "type": "Master of Science in Health Systems thesis",
+    "url": "https://central.bac-lac.gc.ca/.item?app=Library&id=TC-OOU-30426&oclc_number=1033165836&op=pdf",
+    "persistent_url": "https://hdl.handle.net/10393/30426",
+    "table_page": 93,
+    "variable_definitions_page": 48,
+    "data_context_page": 55,
+    "access_note": "Matched the web-indexed text of the primary PDF; full PDF fetch was unavailable during verification."
+  },
+  "unit_of_analysis": "Lekarz pediatrycznego oddziału ratunkowego",
+  "hospital": "Children's Hospital of Eastern Ontario (CHEO), Ottawa, Kanada",
+  "observation_year": 2011,
+  "complaint_group": "Ból brzucha i zaparcia",
+  "row_mapping": "DMU_01..DMU_20 odpowiadają MD1..MD20",
+  "matched_numeric_values": 80,
+  "variables": {
+    "i1": {"source_name": "AVG_MDTIME_PAT", "meaning": "Średni czas od pierwszej oceny do decyzji o dalszym postępowaniu, na wizytę", "unit": null},
+    "i2": {"source_name": "AVG_LAB_PAT", "meaning": "Średnia liczba badań laboratoryjnych na wizytę", "unit": "badania/wizyta"},
+    "i3": {"source_name": "AVG_RAD_PAT", "meaning": "Średnia liczba zleceń radiologicznych na wizytę", "unit": "zlecenia/wizyta"},
+    "o1": {"source_name": "RATE_NR72", "meaning": "Udział wizyt bez powrotu pacjenta w ciągu 72 godzin", "unit": "ułamek 0–1"}
+  },
+  "related_article": {
+    "authors": "Fiallos, J.; Patrick, J.; Michalowski, W.; Farion, K.",
+    "year": 2017,
+    "title": "Using data envelopment analysis for assessing the performance of pediatric emergency department physicians",
+    "journal": "Health Care Management Science 20, 129–140",
+    "doi": "10.1007/s10729-015-9344-0",
+    "url": "https://pubmed.ncbi.nlm.nih.gov/26438625/"
+  },
+  "unresolved": ["Jednostka czasu i dokładna historia importu CSV do repozytorium niepotwierdzone."]
+}

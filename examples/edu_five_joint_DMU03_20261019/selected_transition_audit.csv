@@ -1,0 +1,16 @@
+method,stage,predecessor,selected,tested_points,milestone_pool,front_size,selected_on_front,dominating_points
+hasse_path,1,DMU_03,pos_dense_grid_0000711,3645,3381,18,True,0
+hasse_path,2,pos_dense_grid_0000711,pos_dense_grid_0000698,3645,2903,25,True,0
+hasse_path,3,pos_dense_grid_0000698,DMU_03_fictive_000021,3645,501,75,True,0
+front_path,1,DMU_03,pos_jitter_0002873,3645,1447,60,True,0
+front_path,2,pos_jitter_0002873,pos_jitter_0001215,3645,603,18,True,0
+front_path,3,pos_jitter_0001215,DMU_03_fictive_000125,3645,1,1,True,0
+best_rank_path,1,DMU_03,pos_jitter_0003269,3645,3318,51,True,0
+best_rank_path,2,pos_jitter_0003269,pos_jitter_0002941,3645,2884,58,True,0
+best_rank_path,3,pos_jitter_0002941,pos_dense_grid_0000509,3645,501,67,True,0
+best_efficiency_path,1,DMU_03,pos_jitter_0002659,3645,3123,47,True,0
+best_efficiency_path,2,pos_jitter_0002659,pos_jitter_0002577,3645,2320,66,True,0
+best_efficiency_path,3,pos_jitter_0002577,pos_jitter_0002205,3645,501,59,True,0
+robustness_width_path,1,DMU_03,pos_jitter_0003530,3645,1216,9,True,0
+robustness_width_path,2,pos_jitter_0003530,pos_jitter_0003453,3645,704,20,True,0
+robustness_width_path,3,pos_jitter_0003453,pos_jitter_0000738,3645,41,20,True,0
